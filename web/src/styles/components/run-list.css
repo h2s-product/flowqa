@@ -1,0 +1,12 @@
+/* Varian daftar run dengan badge di kanan. */
+/* Daftar run dengan badge status di kanan (mis. Recent runs di editor UI test). */
+.run-list.with-badge .r {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.run-list.with-badge time.dt {
+  white-space: normal;
+}
+.modal:focus {
+  outline: none;
+}

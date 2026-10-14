@@ -1,0 +1,16 @@
+/* Komponen DateTime. */
+time.dt {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 12px;
+}
+.report-meta b {
+  color: var(--ink2);
+  font-weight: 600;
+}

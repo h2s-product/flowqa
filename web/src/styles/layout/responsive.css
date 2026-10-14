@@ -1,0 +1,48 @@
+/* Penyesuaian layar sempit untuk kerangka & halaman utama. */
+@media (max-width: 1100px) {
+  .c-8,
+  .c-4,
+  .c-6 {
+    grid-column: span 12;
+  }
+  .builder {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 820px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .side {
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    align-items: center;
+  }
+  .brand small,
+  .side-foot,
+  .proj-switch {
+    display: none;
+  }
+  .nav {
+    flex-direction: row;
+    padding: 6px;
+  }
+  .nav .count {
+    display: none;
+  }
+  .topbar,
+  .page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .env-layout {
+    grid-template-columns: 1fr;
+  }
+  .assert-row,
+  .assert-row.nofield {
+    grid-template-columns: 1fr 1fr;
+  }
+}

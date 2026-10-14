@@ -1,0 +1,61 @@
+/* Builder: run bar, tombol tambah step, baris hasil, progress. */
+.flow {
+  padding: 14px;
+}
+.cfg {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+}
+.run-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.add-step {
+  margin-top: 4px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px dashed var(--line2);
+  background: transparent;
+  border-radius: 11px;
+  padding: 12px;
+  cursor: pointer;
+  color: var(--ink2);
+  font: inherit;
+  font-weight: 550;
+}
+.add-step:hover {
+  border-color: var(--brand);
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+.res-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.res-row:last-child {
+  border-bottom: 0;
+}
+.res-row:hover {
+  background: var(--surface2);
+}
+.res-row b {
+  font-weight: 600;
+}
+.progress > div {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}

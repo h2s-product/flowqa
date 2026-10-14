@@ -1,0 +1,97 @@
+/* Design token: warna (terang & gelap), bayangan, font. Semua warna komponen memakai token ini. */
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface2: #eef1f8;
+  --line: #dfe4ef;
+  --line2: #c9d1e1;
+  --ink: #0b1a33;
+  --ink2: #4a5670;
+  --ink3: #737e95;
+  /* Brand Testora (biru–indigo logo): aksi utama, navigasi aktif, pilihan terpilih. */
+  --brand: #2f4fe0;
+  --brand-ink: #2439c4;
+  --brand-soft: #e9eeff;
+  --brand-gradient: linear-gradient(135deg, #107ef8 0%, #4672fa 45%, #2d3ad7 100%);
+  /* Aksen teal (centang logo): alur variabel & capture. */
+  --accent: #0a9e9b;
+  --accent-ink: #067573;
+  --accent-soft: #dcf6f5;
+  /* Warna status (bermakna tetap). */
+  --green: #0e9577;
+  --green-ink: #08705a;
+  --green-soft: #dcf5ee;
+  --blue: #1668e3;
+  --blue-soft: #e4eefd;
+  --red: #cf3b45;
+  --red-soft: #fce8e9;
+  --amber: #b67a09;
+  --amber-soft: #fbf0d9;
+  --violet: #6d55e0;
+  --violet-soft: #ece8fc;
+  --shadow: 0 1px 2px rgba(11, 26, 51, 0.06), 0 4px 14px rgba(11, 26, 51, 0.06);
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b1120;
+    --surface: #111a2e;
+    --surface2: #17223a;
+    --line: #243049;
+    --line2: #33415f;
+    --ink: #e6ebf5;
+    --ink2: #aab4c8;
+    --ink3: #7d89a3;
+    --brand: #4a66ee;
+    --brand-ink: #a8b8ff;
+    --brand-soft: #1c2656;
+    --brand-gradient: linear-gradient(135deg, #3d8dff 0%, #5b7dff 45%, #4a52e6 100%);
+    --accent: #22c7c3;
+    --accent-ink: #6fe6e2;
+    --accent-soft: #0f3637;
+    --green: #2fc79f;
+    --green-ink: #6fe3c2;
+    --green-soft: #0f3a33;
+    --blue: #5b8cf0;
+    --blue-soft: #1a2a4a;
+    --red: #ee6069;
+    --red-soft: #3d1d21;
+    --amber: #e0a93a;
+    --amber-soft: #3a2e14;
+    --violet: #9a88f5;
+    --violet-soft: #2a2448;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #0b1120;
+  --surface: #111a2e;
+  --surface2: #17223a;
+  --line: #243049;
+  --line2: #33415f;
+  --ink: #e6ebf5;
+  --ink2: #aab4c8;
+  --ink3: #7d89a3;
+  --brand: #4a66ee;
+  --brand-ink: #a8b8ff;
+  --brand-soft: #1c2656;
+  --brand-gradient: linear-gradient(135deg, #3d8dff 0%, #5b7dff 45%, #4a52e6 100%);
+  --accent: #22c7c3;
+  --accent-ink: #6fe6e2;
+  --accent-soft: #0f3637;
+  --green: #2fc79f;
+  --green-ink: #6fe3c2;
+  --green-soft: #0f3a33;
+  --blue: #5b8cf0;
+  --blue-soft: #1a2a4a;
+  --red: #ee6069;
+  --red-soft: #3d1d21;
+  --amber: #e0a93a;
+  --amber-soft: #3a2e14;
+  --violet: #9a88f5;
+  --violet-soft: #2a2448;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}

@@ -1,0 +1,39 @@
+/* Logo Testora (sidebar & login). */
+.brand-logo {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.auth-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 22px;
+  padding: 14px 12px 12px;
+  border-radius: 12px;
+}
+.auth-logo img {
+  width: 260px;
+  height: auto;
+}
+.auth-logo small {
+  color: var(--ink3);
+  font-size: 12px;
+}
+/* Teks logo berwarna navy: beri alas terang di tema gelap agar tetap terbaca. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .auth-logo {
+    background: #f4f6fb;
+  }
+  :root:not([data-theme='light']) .auth-logo small {
+    color: #4a5670;
+  }
+}
+:root[data-theme='dark'] .auth-logo {
+  background: #f4f6fb;
+}
+:root[data-theme='dark'] .auth-logo small {
+  color: #4a5670;
+}

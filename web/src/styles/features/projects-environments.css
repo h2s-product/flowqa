@@ -1,0 +1,58 @@
+/* Kartu project, halaman environment, judul grup, pemisah. */
+.proj-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+.proj-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.proj-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.env-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.env-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.env-item:hover {
+  background: var(--surface2);
+}
+.env-item.on {
+  background: var(--brand-soft);
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+}
+.group-h {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink3);
+  padding: 14px 16px 6px;
+}
+.hint {
+  font-size: 12px;
+  color: var(--ink3);
+}
+.sep {
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0;
+}

@@ -1,0 +1,87 @@
+/* Performance & stress test. */
+.st-stopped {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.ts-chart svg {
+  display: block;
+  cursor: crosshair;
+}
+.ts-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  color: var(--ink2);
+  min-height: 18px;
+}
+.ts-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.ts-legend b {
+  font-variant-numeric: tabular-nums;
+}
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+.preset {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+.preset:hover {
+  border-color: var(--line2);
+}
+.preset.on {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand) inset;
+  background: var(--brand-soft);
+}
+.preset b {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+.preset span {
+  font-size: 12px;
+  color: var(--ink2);
+  line-height: 1.35;
+}
+.stage-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.threshold {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.threshold:last-child {
+  border-bottom: 0;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

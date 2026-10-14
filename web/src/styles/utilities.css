@@ -1,0 +1,28 @@
+/* Kelas utilitas kecil (jarak, warna status teks). Tambahkan dengan hemat. */
+.toolbar {
+  margin-bottom: 16px;
+}
+.detail-bar {
+  margin-bottom: 14px;
+}
+.mt-12 {
+  margin-top: 12px;
+}
+.mb-12 {
+  margin-bottom: 12px;
+}
+.mb-14 {
+  margin-bottom: 14px;
+}
+.mb-16 {
+  margin-bottom: 16px;
+}
+.text-pass {
+  color: var(--green-ink);
+}
+.text-fail {
+  color: var(--red);
+}
+.stat b.stat-sm {
+  font-size: 16px;
+}

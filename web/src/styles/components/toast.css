@@ -1,0 +1,14 @@
+/* Notifikasi toast. */
+.toast {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 10px;
+  z-index: 80;
+  font-weight: 550;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}

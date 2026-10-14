@@ -1,0 +1,32 @@
+/**
+ * Gaya global Testora. Urutan import = urutan cascade (jangan diubah sembarangan).
+ * Token warna ada di tokens.css; panduan komponen: docs/UI-COMPONENTS.md
+ */
+@import './tokens.css';
+@import './base.css';
+@import './layout/sidebar-main.css';
+@import './components/primitives.css';
+@import './features/dashboard.css';
+@import './features/builder.css';
+@import './components/json-view.css';
+@import './components/modal.css';
+@import './features/add-step.css';
+@import './components/toast.css';
+@import './features/projects-environments.css';
+@import './layout/responsive.css';
+@import './components/feedback.css';
+@import './features/builder-extras.css';
+@import './features/performance.css';
+@import './features/auth.css';
+@import './layout/side-user.css';
+@import './features/users.css';
+@import './features/settings.css';
+@import './components/folders.css';
+@import './components/brand.css';
+@import './features/report.css';
+@import './components/datetime.css';
+@import './layout/mode-switch.css';
+@import './features/ui-tester.css';
+@import './features/e2e.css';
+@import './components/run-list.css';
+@import './utilities.css';

@@ -1,0 +1,182 @@
+/* Kerangka aplikasi: sidebar, area utama, topbar. */
+.side {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 18px 18px 14px;
+}
+.brand b {
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  display: block;
+  line-height: 1.1;
+}
+.brand small {
+  color: var(--ink3);
+  font-size: 11.5px;
+  line-height: 1.2;
+  display: block;
+}
+.proj-switch {
+  margin: 4px 12px 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface2);
+  width: calc(100% - 24px);
+  text-align: left;
+  cursor: pointer;
+}
+.proj-switch span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+.proj-switch select {
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+}
+.nav a {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--ink2);
+  text-align: left;
+  font-weight: 500;
+}
+.nav a:hover {
+  background: var(--surface2);
+  color: var(--ink);
+}
+.nav a.sub {
+  padding-left: 36px;
+  font-size: 13px;
+}
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink2);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-group:hover {
+  background: var(--surface2);
+  color: var(--ink);
+}
+.nav-group.active {
+  color: var(--brand-ink);
+}
+.nav a.on {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+.nav svg {
+  flex: none;
+}
+.nav .count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink3);
+}
+.side-foot {
+  margin-top: auto;
+  padding: 14px 18px;
+  font-size: 12px;
+  color: var(--ink3);
+  border-top: 1px solid var(--line);
+}
+/* main */
+.main {
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.topbar h1 {
+  font-size: 19px;
+  margin: 0;
+  letter-spacing: -0.015em;
+  font-weight: 650;
+}
+.crumb {
+  color: var(--ink3);
+  font-size: 13px;
+}
+.topbar .grow {
+  flex: 1;
+}
+.env-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 6px 5px 10px;
+}
+.env-pick label {
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+.env-pick select {
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+.env-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.page {
+  padding: 24px 28px 56px;
+  width: 100%;
+  max-width: 1480px;
+}

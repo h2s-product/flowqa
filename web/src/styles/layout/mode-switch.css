@@ -1,0 +1,33 @@
+/* Pemilih mode API Tester / UI Tester. */
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin: 0 14px 12px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+}
+.mode-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mode-switch button.on {
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--shadow);
+}

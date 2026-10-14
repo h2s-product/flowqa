@@ -1,0 +1,395 @@
+/* UI Tester: daftar step, perekam, screenshot, lightbox. */
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-step-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: var(--surface2);
+  color: var(--ink2);
+}
+.ui-step-icon.assert {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.ui-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ui-step-list > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+.ui-step-list > li:first-child {
+  border-top: 0;
+}
+.ui-step-list .num {
+  width: 22px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.ui-step-list.editable > li {
+  display: block;
+  padding: 0;
+}
+.ui-step-list.editable > li.off {
+  opacity: 0.55;
+}
+.ui-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.ui-step-row:hover,
+.ui-step-list.editable > li.open .ui-step-row {
+  background: var(--surface2);
+}
+.ui-step-edit {
+  padding: 12px 16px 16px 64px;
+  background: var(--surface2);
+  border-top: 1px dashed var(--line);
+}
+.ui-step-list.results > li.failed {
+  background: var(--red-soft);
+}
+.ui-shot {
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+.ui-shot img {
+  display: block;
+  width: 120px;
+  height: 75px;
+  object-fit: cover;
+  object-position: top;
+}
+.lightbox {
+  width: min(1100px, 94vw);
+  max-height: 94vh;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.lightbox img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.rec-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.rec-status.recording {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+.rec-status.failed {
+  border-color: var(--red);
+}
+.rec-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ink3);
+}
+.rec-status.recording .rec-dot,
+.rec-status.replaying .rec-dot,
+.rec-status.signing-in .rec-dot,
+.rec-status.starting .rec-dot {
+  background: var(--red);
+  animation: rec-pulse 1.2s infinite;
+}
+.rec-status.stopped .rec-dot {
+  background: var(--green);
+}
+@keyframes rec-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot {
+    animation: none !important;
+  }
+}
+.rec-tips ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.rec-tips li {
+  margin-bottom: 4px;
+}
+table.t tr.run-group td {
+  background: var(--surface2);
+  cursor: pointer;
+  border-top: 1px solid var(--line);
+}
+table.t tr.run-group:hover td {
+  background: var(--line);
+}
+table.t tr.run-group svg {
+  color: var(--ink3);
+}
+
+/* Login otomatis di modal "New recording". */
+.rec-login {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+.rec-remember {
+  padding: 12px 14px;
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+}
+.rec-remember ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--ink2);
+}
+.rec-login-advanced summary {
+  cursor: pointer;
+  color: var(--ink2);
+}
+
+/* Test Scheduler: pemilih UI test case per folder. */
+.sched-picker {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.sched-picker-list {
+  max-height: 280px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+.sched-group-h,
+.sched-test {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.sched-group-h {
+  background: var(--surface2);
+  font-weight: 600;
+  font-size: 13px;
+}
+.sched-test {
+  padding-left: 32px;
+  font-size: 13.5px;
+}
+.sched-test:hover {
+  background: var(--surface2);
+}
+.sched-test span:first-of-type {
+  flex: 1;
+}
+.sched-names {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mobile Inspector: layar perangkat | elemen terpilih | step yang direkam. */
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) minmax(0, 1fr) minmax(260px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+.inspector-device {
+  position: relative;
+  width: 100%;
+  max-height: 72vh;
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  cursor: crosshair;
+  user-select: none;
+}
+.inspector-device.placeholder {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 9 / 19;
+  cursor: default;
+}
+.inspector-device img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.inspector-device.dim img {
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+.inspector-box {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 3px;
+}
+.inspector-box.hover {
+  border: 1.5px dashed var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.inspector-box.selected {
+  border: 2px solid var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+.inspector-global {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+.inspector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.inspector-list li + li {
+  border-top: 1px solid var(--line);
+}
+.inspector-list button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.inspector-list button:hover {
+  background: var(--surface2);
+}
+.inspector-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+}
+.inspector-attrs dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.inspector-steps .ui-step-list {
+  max-height: 46vh;
+  overflow: auto;
+}
+.inspector-save {
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 1180px) {
+  .inspector {
+    grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  }
+  .inspector-steps {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 720px) {
+  .inspector {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Label platform di daftar UI test. */
+.platform-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: 1px;
+}
+
+/* Editor test mobile: konfigurasi aplikasi & perangkat. */
+.mobile-app-config {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+.mobile-app-config summary {
+  cursor: pointer;
+}
+
+/* Screenshot aplikasi mobile (layar tegak). */
+.ui-shot.portrait img {
+  width: 44px;
+  height: 92px;
+}
+.lightbox.portrait {
+  width: min(520px, 94vw);
+}
+.lightbox.portrait img {
+  width: auto;
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0 auto;
+}
+
+/* Error mobile yang bisa ditindaklanjuti (kode + tombol). */
+.mobile-error {
+  padding: 12px 14px;
+  border: 1px solid var(--amber);
+  border-radius: 10px;
+  background: var(--amber-soft);
+}
+.mt-8 {
+  margin-top: 8px;
+}
+.inspector-box.match {
+  border: 2px solid var(--amber);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+}
+.mobile-error-msg {
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* Test Case ID (TC-xxxx) di daftar test & run. */
+.test-code {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  margin-right: 4px;
+  vertical-align: 1px;
+}

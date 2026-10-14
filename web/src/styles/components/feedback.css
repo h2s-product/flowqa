@@ -1,0 +1,21 @@
+/* Spinner, loading, kotak error, link polos. */
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+.page-loading {
+  padding: 60px;
+  text-align: center;
+  color: var(--ink3);
+}
+.error-box {
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 13px;
+}
+a.plain {
+  color: inherit;
+  text-decoration: none;
+}

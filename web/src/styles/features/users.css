@@ -1,0 +1,26 @@
+/* User Administration. */
+.access-list {
+  max-height: 320px;
+  overflow: auto;
+}
+.access-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 13px;
+}
+.access-item:last-child {
+  border-bottom: 0;
+}
+.access-item:hover {
+  background: var(--surface2);
+}
+.access-item input {
+  margin-top: 2px;
+}
+.chip.chip-text {
+  font-family: inherit;
+}

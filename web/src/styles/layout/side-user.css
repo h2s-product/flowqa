@@ -1,0 +1,43 @@
+/* Info user di bawah sidebar. */
+.side-user {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 12px 18px;
+  border-top: 1px solid var(--line);
+}
+.side-user + .side-foot {
+  margin-top: 0;
+}
+.side-user .avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+.side-user .who {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+.side-user .who b,
+.side-user .who small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-user .who b {
+  font-size: 13px;
+}
+.side-user .who small {
+  font-size: 11.5px;
+  color: var(--ink3);
+}

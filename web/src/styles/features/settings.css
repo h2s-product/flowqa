@@ -1,0 +1,166 @@
+/* Settings (khusus admin): Email Report. */
+.settings-page {
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+}
+.settings-test {
+  border-top: 1px solid var(--line);
+}
+/* Kolom email melebar; tombol "Send test email" sejajar baris pertama chip. */
+.settings-test-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+.settings-test-row > .btn {
+  height: 40px;
+}
+.settings-actions {
+  gap: 10px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .settings-test-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Settings → Mobile (Appium): panduan setup. */
+.appium-guide ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+.appium-guide pre {
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Settings → Mobile (Android). */
+.android-tabs .tabs {
+  border-bottom: 0;
+}
+table.t tr.group-start td {
+  border-top: 2px solid var(--line2);
+}
+.setup-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+.setup-steps.done {
+  list-style: none;
+  padding-left: 0;
+}
+.setup-steps .ri {
+  display: inline-grid;
+  vertical-align: -3px;
+}
+.setup-log {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+}
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.health-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.health-item.ok {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.connection-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 16px;
+  align-items: start;
+}
+.connection-shot {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+@media (max-width: 720px) {
+  .connection-result {
+    grid-template-columns: 1fr;
+  }
+}
+/* Path & perintah panjang tidak boleh melebarkan halaman. */
+.settings-page {
+  min-width: 0;
+}
+.settings-page .panel-h {
+  flex-wrap: wrap;
+}
+.settings-page table.t td {
+  overflow-wrap: break-word;
+}
+.settings-page .status {
+  white-space: nowrap;
+}
+.settings-page table.t td.code {
+  white-space: normal;
+}
+.firebase-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.firebase-events li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+}
+.firebase-events li:first-child {
+  border-top: 0;
+}
+.firebase-events .ri {
+  display: inline-grid;
+}
+.firebase-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.firebase-events li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+}
+.firebase-events li:first-child {
+  border-top: 0;
+}
+.firebase-events .ri {
+  display: inline-grid;
+}

@@ -1,0 +1,28 @@
+/* Tampilan JSON (response viewer). */
+pre.json {
+  margin: 0;
+  font: 12.5px/1.6 var(--mono);
+  background: var(--surface2);
+  border-radius: 9px;
+  padding: 12px 14px;
+  overflow: auto;
+  max-height: 440px;
+  white-space: pre;
+}
+.json .k {
+  color: var(--blue);
+}
+.json .s {
+  color: var(--green-ink);
+}
+.json .n {
+  color: var(--amber);
+}
+.json .b {
+  color: var(--violet);
+}
+.json .hl {
+  background: var(--red-soft);
+  outline: 1px solid color-mix(in srgb, var(--red) 40%, transparent);
+  border-radius: 3px;
+}
