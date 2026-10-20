@@ -190,6 +190,10 @@ export function renderManualBook(input: ManualBookInput): string {
       if (step.sensitive) notes.push('Nilai rahasia disamarkan.');
       if (step.onFailPass)
         notes.push('Bila kondisi ini tidak terpenuhi, pengujian selesai dan dianggap lulus.');
+      if (step.onFailSkip)
+        notes.push(
+          `Bila kondisi ini tidak terpenuhi, ${step.onFailSkip} langkah berikutnya dilewati dan pengujian berlanjut.`,
+        );
       if (step.retryFrom) {
         const target = test.steps.findIndex((s) => s.id === step.retryFrom);
         notes.push(`Bila gagal, ulangi dari langkah ${target + 1} (maks. ${step.retryMax ?? 3} kali).`);

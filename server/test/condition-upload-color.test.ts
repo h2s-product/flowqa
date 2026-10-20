@@ -150,4 +150,38 @@ describe('End the test as passed when a condition is not met', () => {
     assert.match(run.steps[1].error ?? '', /Condition not met, so the test ends here and counts as passed/);
     assert.match(run.steps[2].error ?? '', /test ended at step 2/);
   });
+
+  it('"If this step fails: skip the next steps" skips only that part and continues', async () => {
+    const repos = createRepositories(openDatabase(':memory:'));
+    const ctx = createAppContext(repos, {} as never, null);
+    ctx.appium.save({ serverUrl: 'http://appium.invalid:4723', capabilities: '', defaultMode: 'mock' });
+    const projectId = repos.projects.save(normalizeProject({ name: 'P' })).id;
+    const test = repos.uiTests.save(
+      normalizeUiTest(
+        {
+          name: 'Optional part',
+          target: 'mobile',
+          mobile: { platform: 'android', app: '', appPackage: 'com.demo' },
+          steps: [
+            { type: 'assertVisible', selectors: ['text=Demo Shop'] },
+            { type: 'assertVisible', selectors: ['text=+ Tambah catatan'], timeoutMs: 500, onFailSkip: 2 },
+            { type: 'click', selectors: ['~does-not-exist'] },
+            { type: 'click', selectors: ['~does-not-exist-either'] },
+            { type: 'assertVisible', selectors: ['text=Demo Shop'] },
+          ].map((s) => normalizeUiStep(s)),
+        },
+        projectId,
+      ),
+    );
+    assert.equal(test.steps[1].onFailSkip, 2);
+    const run = (await ctx.uiRuns.wait(ctx.uiRuns.start(test.id, { mode: 'mock' }).id))!;
+    assert.equal(run.status, 'passed', run.failureReason);
+    assert.deepEqual(
+      run.steps.map((s) => s.status),
+      ['passed', 'skipped', 'skipped', 'skipped', 'passed'],
+      'the steps after the skipped part still run',
+    );
+    assert.match(run.steps[1].error ?? '', /steps 3–4 are skipped and the test continues/);
+    assert.match(run.steps[2].error ?? '', /condition of step 2 was not met/);
+  });
 });

@@ -84,7 +84,16 @@ export function UiTestEditorPage() {
       type,
       description: stepTypeLabel(type, target),
       selectors: [],
-      value: type === 'wait' ? '1000' : type === 'swipe' ? 'up' : type === 'scrollTo' ? 'down' : type === 'assertSorted' ? 'ascending' : '',
+      value:
+        type === 'wait'
+          ? '1000'
+          : type === 'swipe'
+            ? 'up'
+            : type === 'scrollTo'
+              ? 'down'
+              : type === 'assertSorted'
+                ? 'ascending'
+                : '',
       timeoutMs: null,
       disabled: false,
       ...(type === 'pickOption' ? { pick: DEFAULT_PICK, selectors: ['role=option'] } : {}),
@@ -573,14 +582,14 @@ function StepEditor({
             step.type === 'assertSorted'
               ? 'Must match the value in EVERY item, e.g. the due date or the amount of each card. Dates (5 Okt 2026, 05/10/2026) and numbers (Rp 195.000.000) are compared; other text is ignored.'
               : step.type === 'assertEach'
-              ? target === 'mobile'
-                ? 'Must match EVERY item to check, e.g. id=com.app:id/order_title. The check waits until the list updates, and fails if nothing is shown.'
-                : 'Must match EVERY row to check, e.g. table tbody tr. The check waits until the rows update, and fails if no rows are shown.'
-              : isPick
-                ? 'Must match EVERY option in the list, e.g. role=option or [role=listbox] button. For a normal dropdown, point to the <select> itself.'
-                : step.type === 'swipe'
-                  ? 'Optional: swipe inside this element (e.g. a carousel). Empty = the whole screen.'
-                  : SELECTOR_HINT[target]
+                ? target === 'mobile'
+                  ? 'Must match EVERY item to check, e.g. id=com.app:id/order_title. The check waits until the list updates, and fails if nothing is shown.'
+                  : 'Must match EVERY row to check, e.g. table tbody tr. The check waits until the rows update, and fails if no rows are shown.'
+                : isPick
+                  ? 'Must match EVERY option in the list, e.g. role=option or [role=listbox] button. For a normal dropdown, point to the <select> itself.'
+                  : step.type === 'swipe'
+                    ? 'Optional: swipe inside this element (e.g. a carousel). Empty = the whole screen.'
+                    : SELECTOR_HINT[target]
           }
         >
           <textarea
@@ -694,25 +703,53 @@ function StepEditor({
         <select
           className="in"
           style={{ width: 'auto', maxWidth: 360 }}
-          value={step.onFailPass ? '__pass' : (step.retryFrom ?? '')}
-          onChange={(e) =>
+          value={step.onFailPass ? '__pass' : step.onFailSkip ? '__skip' : (step.retryFrom ?? '')}
+          onChange={(e) => {
+            const none = {
+              retryFrom: undefined,
+              retryMax: undefined,
+              onFailPass: undefined,
+              onFailSkip: undefined,
+            };
             onChange(
               e.target.value === '__pass'
-                ? { onFailPass: true, retryFrom: undefined, retryMax: undefined }
-                : e.target.value
-                  ? { retryFrom: e.target.value, retryMax: step.retryMax ?? 3, onFailPass: undefined }
-                  : { retryFrom: undefined, retryMax: undefined, onFailPass: undefined },
-            )
-          }
+                ? { ...none, onFailPass: true }
+                : e.target.value === '__skip'
+                  ? { ...none, onFailSkip: step.onFailSkip ?? 1 }
+                  : e.target.value
+                    ? { ...none, retryFrom: e.target.value, retryMax: step.retryMax ?? 3 }
+                    : none,
+            );
+          }}
         >
           <option value="">stop the test (default)</option>
           <option value="__pass">end the test as passed (skip the rest, e.g. no data to test)</option>
+          <option value="__skip">skip the next steps and continue (a part that only shows sometimes)</option>
           {steps.slice(0, position + 1).map((s, i) => (
             <option key={s.id} value={s.id}>
               retry from step {i + 1} · {s.description.slice(0, 50)}
             </option>
           ))}
         </select>
+        {!!step.onFailSkip && (
+          <label className="row" style={{ gap: 6 }}>
+            skip the next
+            <input
+              className="in"
+              type="number"
+              min={1}
+              max={50}
+              style={{ width: 70 }}
+              value={step.onFailSkip}
+              onChange={(e) =>
+                onChange({ onFailSkip: Math.min(Math.max(Number(e.target.value) || 1, 1), 50) })
+              }
+            />
+            {step.onFailSkip === 1 ? 'step' : 'steps'}
+            {steps[position + step.onFailSkip] &&
+              ` (to step ${position + 1 + step.onFailSkip} · ${steps[position + step.onFailSkip].description.slice(0, 40)})`}
+          </label>
+        )}
         {step.retryFrom && (
           <label className="row" style={{ gap: 6 }}>
             up to

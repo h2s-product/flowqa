@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { E2EFlow, FlowRun } from '@flowqa/shared';
+import type { E2EFlow, FlowRun, FlowRunOptions } from '@flowqa/shared';
 import { http, toQuery } from '../client';
 import { POLL, keys, pollWhile } from './keys';
 import { useInvalidate } from './shared';
@@ -63,8 +63,15 @@ export function useDuplicateFlow(projectId: string) {
 export function useRunFlow(projectId: string) {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: ({ id, environmentId }: { id: string; environmentId?: string | null }) =>
-      http.post<FlowRun>(`/e2e-flows/${id}/run`, { environmentId }),
+    mutationFn: ({
+      id,
+      environmentId,
+      options,
+    }: {
+      id: string;
+      environmentId?: string | null;
+      options?: FlowRunOptions;
+    }) => http.post<FlowRun>(`/e2e-flows/${id}/run`, { environmentId, options }),
     onSuccess: () => invalidate(keys.flows(projectId), keys.flowRunsAll(projectId)),
   });
 }

@@ -413,6 +413,28 @@ describe('Android runs, Mock & Real mode, Mobile Inspector', () => {
     assert.ok(appium.state.sessions.at(-1)!.deleted, 'the session is closed and the device released');
   });
 
+  it('uses the chosen mode when the test is pinned to a device of the other type', async () => {
+    const phone: AndroidDevice = { ...EMULATOR, id: 'R58N1', type: 'device', connection: 'USB' };
+    const { repos, ctx, projectId } = setup([EMULATOR, phone]);
+    const pinned = (udid: string) =>
+      repos.uiTests.save(
+        normalizeUiTest(
+          { name: 'Pinned', target: 'mobile', mobile: { ...APP, udid }, steps: loginSteps() },
+          projectId,
+        ),
+      );
+    const onEmulator = (await ctx.uiRuns.wait(
+      ctx.uiRuns.start(pinned('R58N1').id, { mode: 'emulator' }).id,
+    ))!;
+    assert.equal(onEmulator.mobile?.udid, 'emulator-5554', 'a phone serial does not override "Emulator"');
+    const onPhone = (await ctx.uiRuns.wait(
+      ctx.uiRuns.start(pinned('emulator-5554').id, { mode: 'device' }).id,
+    ))!;
+    assert.equal(onPhone.mobile?.udid, 'R58N1', 'an emulator serial does not override "Device"');
+    const same = (await ctx.uiRuns.wait(ctx.uiRuns.start(pinned('R58N1').id, { mode: 'device' }).id))!;
+    assert.equal(same.mobile?.udid, 'R58N1', 'a serial of the chosen type is still used');
+  });
+
   it('marks runs that cannot start as ERROR with an actionable code', async () => {
     const make = (ctx: ReturnType<typeof setup>) =>
       ctx.repos.uiTests.save(
