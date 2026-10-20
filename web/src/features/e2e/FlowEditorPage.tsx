@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import type { E2EFlow, FlowEdge, FlowNode, MobileExecutionMode } from '@flowqa/shared';
-import { useFlow, useFlowRuns, useRunFlow, useSaveFlow, useScenarios, useUiTests } from '@/api/queries';
+import { useFlow, useFlowRuns, useSaveFlow, useScenarios, useUiTests } from '@/api/queries';
 import { DateTime } from '@/components/DateTime';
 import { Icon } from '@/components/Icon';
 import {
@@ -19,6 +19,7 @@ import { useConfirm } from '@/context/ConfirmContext';
 import { useToast } from '@/context/ToastContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { FlowCanvas, KIND_META, NODE_W, PALETTE_MIME, type PaletteItem } from './FlowCanvas';
+import { useFlowRunner } from './FlowRunDialog';
 import {
   CONTROL_ITEMS,
   itemFromScenario,
@@ -41,8 +42,7 @@ export function FlowEditorPage() {
   const { data: scenarios = [] } = useScenarios(projectId);
   const { data: runs = [] } = useFlowRuns(projectId, { flowId, limit: 5 });
   const save = useSaveFlow(projectId);
-  const run = useRunFlow(projectId);
-  const navigate = useNavigate();
+  const run = useFlowRunner(projectId);
   const toast = useToast();
   const confirm = useConfirm();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -154,11 +154,7 @@ export function FlowEditorPage() {
     setSelected(null);
   };
   const start = () => {
-    const go = () =>
-      run.mutate(
-        { id: flowId, environmentId: draft.environmentId },
-        { onSuccess: (r) => navigate(`/e2e/runs/${r.id}`) },
-      );
+    const go = () => run.request({ id: flowId, nodes: draft.nodes, environmentId: draft.environmentId });
     if (dirty) persist(go);
     else go();
   };
@@ -204,8 +200,9 @@ export function FlowEditorPage() {
           disabled={!runnable || run.isPending || !draft.name.trim()}
           onClick={start}
         >
-          <Icon name="play" size={13} /> {run.isPending ? 'Starting…' : 'Run flow'}
+          <Icon name="play" size={13} /> {run.isPending ? 'Starting…' : 'Run flow…'}
         </button>
+        {run.dialog}
       </div>
       {problems.length > 0 && !dirty && (
         <div className="banner warn mb-12">

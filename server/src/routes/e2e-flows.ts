@@ -96,9 +96,12 @@ export function e2eFlowRoutes(ctx: AppContext): Router {
     '/e2e-flows/:id/run',
     asyncHandler((req, res) => {
       const flow = requireOwned(ctx, res, flows.get(req.params.id), 'E2E flow');
-      res
-        .status(202)
-        .json(ctx.flowRuns.start(flow.id, { environmentId: req.body?.environmentId || undefined }));
+      res.status(202).json(
+        ctx.flowRuns.start(flow.id, {
+          environmentId: req.body?.environmentId || undefined,
+          run: req.body?.options,
+        }),
+      );
     }),
   );
 

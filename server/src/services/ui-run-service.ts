@@ -598,6 +598,8 @@ export class UiRunService {
     const attemptLog = new Map<number, string[]>();
     // "Bila gagal, akhiri test sebagai lulus": nomor step yang mengakhiri test lebih awal.
     let endedAt: number | null = null;
+    // "Bila gagal, lewati N step": step sampai indeks ini dilewati, lalu test berlanjut.
+    let skip: { from: number; until: number } | null = null;
 
     for (let index = 0; index < test.steps.length; index++) {
       const step = test.steps[index];
@@ -614,6 +616,13 @@ export class UiRunService {
         Object.assign(result, {
           status: 'skipped',
           error: `Not needed: the test ended at step ${endedAt + 1} (its condition was not met)`,
+        });
+        continue;
+      }
+      if (skip && index <= skip.until) {
+        Object.assign(result, {
+          status: 'skipped',
+          error: `Not needed: the condition of step ${skip.from + 1} was not met`,
         });
         continue;
       }
@@ -688,6 +697,24 @@ export class UiRunService {
           this.persist(run);
           continue;
         }
+        // "Bila gagal, lewati N step": kondisi tidak terpenuhi → bagian itu dilewati, test berlanjut.
+        if (step.onFailSkip) {
+          const until = Math.min(index + step.onFailSkip, test.steps.length - 1);
+          Object.assign(result, {
+            status: 'skipped',
+            error:
+              until > index
+                ? `Condition not met, so steps ${index + 2}–${until + 1} are skipped and the test continues (${reason})`
+                : `Condition not met; the test continues (${reason})`,
+          });
+          skip = { from: index, until };
+          result.durationMs = Math.round(performance.now() - started);
+          result.finishedAt = nowIso();
+          const shot = await runner.screenshot(dir, `step-${index + 1}`);
+          if (shot) result.screenshot = shot;
+          this.persist(run);
+          continue;
+        }
         // "Bila gagal, ulangi dari step X": kembali ke step itu selama jatah ulang masih ada.
         const target = step.retryFrom ? test.steps.findIndex((s) => s.id === step.retryFrom) : -1;
         const used = retries.get(step.id) ?? 0;
@@ -711,6 +738,7 @@ export class UiRunService {
               delete r[key];
             r.status = 'queued';
           }
+          if (skip && target <= skip.from) skip = null;
           result.detail = `Retrying from step ${target + 1} (${used + 1}/${max}): ${reason}`;
           this.persist(run);
           index = target - 1; // loop menambah 1

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import type { FlowNodeKind } from '@flowqa/shared';
-import { useDeleteFlow, useDuplicateFlow, useFlows, useRunFlow, useSaveFlow } from '@/api/queries';
+import { useDeleteFlow, useDuplicateFlow, useFlows, useSaveFlow } from '@/api/queries';
 import { DateTime } from '@/components/DateTime';
 import { Icon } from '@/components/Icon';
 import { EmptyState, ErrorBox, IconButton, Loading, StatusBadge } from '@/components/ui';
@@ -9,6 +9,7 @@ import { useToast } from '@/context/ToastContext';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { KIND_META } from './FlowCanvas';
 import { newNodeId } from './flowNodes';
+import { useFlowRunner } from './FlowRunDialog';
 
 const COUNTED: FlowNodeKind[] = ['web', 'mobile', 'api'];
 
@@ -17,7 +18,7 @@ export function FlowsPage() {
   const { projectId = '', environment } = useWorkspace();
   const { data: flows = [], isLoading, error } = useFlows(projectId);
   const create = useSaveFlow(projectId);
-  const run = useRunFlow(projectId);
+  const run = useFlowRunner(projectId);
   const duplicate = useDuplicateFlow(projectId);
   const remove = useDeleteFlow(projectId);
   const navigate = useNavigate();
@@ -50,6 +51,7 @@ export function FlowsPage() {
           <Icon name="plus" size={14} /> New flow
         </button>
       </div>
+      {run.dialog}
       {!flows.length ? (
         <div className="panel">
           <EmptyState
@@ -121,9 +123,7 @@ export function FlowsPage() {
                       className="btn sm"
                       disabled={run.isPending || f.problems.length > 0}
                       title={f.problems.join(' ') || 'Run this flow'}
-                      onClick={() =>
-                        run.mutate({ id: f.id }, { onSuccess: (r) => navigate(`/e2e/runs/${r.id}`) })
-                      }
+                      onClick={() => run.request(f)}
                     >
                       <Icon name="play" size={12} /> Run
                     </button>

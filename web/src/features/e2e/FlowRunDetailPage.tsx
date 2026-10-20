@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import type { FlowNodeStatus } from '@flowqa/shared';
-import { useFlowRun, useRunFlow, useScenarios, useStopFlowRun, useUiTests } from '@/api/queries';
+import { useFlowRun, useScenarios, useStopFlowRun, useUiTests } from '@/api/queries';
+import { MOBILE_EXECUTION_MODE_LABEL } from '@flowqa/shared';
 import { DateTime } from '@/components/DateTime';
 import { Icon } from '@/components/Icon';
 import { BackLink, ErrorBox, Loading, Stat, StatGrid, StatusBadge } from '@/components/ui';
@@ -10,6 +11,7 @@ import { formatMs } from '@/lib/format';
 import { StopRunButton, StoppedNote } from '@/components/runs/StopRunButton';
 import { FlowCanvas, KIND_META } from './FlowCanvas';
 import { nodeInfo, type FlowLookups } from './flowNodes';
+import { useFlowRunner } from './FlowRunDialog';
 import { NodeProgressSummary, NodeStepList, useNodeProgress } from './nodeProgress';
 
 /** Hasil satu run E2E Flow: kanvas dengan status tiap node (live) + detail node terpilih. */
@@ -19,9 +21,8 @@ export function FlowRunDetailPage() {
   const { data: run, isLoading, error } = useFlowRun(runId);
   const { data: tests = [] } = useUiTests(projectId);
   const { data: scenarios = [] } = useScenarios(projectId);
-  const again = useRunFlow(projectId);
+  const again = useFlowRunner(projectId);
   const stop = useStopFlowRun();
-  const navigate = useNavigate();
   const [selected, setSelected] = useState<{ node?: string } | null>(null);
   const progress = useNodeProgress(run?.nodes ?? []);
   const lookups: FlowLookups = useMemo(
@@ -64,17 +65,28 @@ export function FlowRunDetailPage() {
           <button
             className="btn primary"
             disabled={again.isPending}
-            onClick={() =>
-              again.mutate({ id: run.flowId }, { onSuccess: (r) => navigate(`/e2e/runs/${r.id}`) })
-            }
+            onClick={() => again.request({ id: run.flowId, nodes: run.graph.nodes }, run.options)}
           >
             <Icon name="play" size={13} /> Run again
           </button>
         )}
+        {again.dialog}
       </div>
 
       <StatGrid className="mb-16" columns={4}>
-        <Stat label="Flow" size="sm" value={run.flowName} sub={run.environmentName} />
+        <Stat
+          label="Flow"
+          size="sm"
+          value={run.flowName}
+          sub={[
+            run.environmentName,
+            run.options?.visible !== undefined &&
+              (run.options.visible ? 'Chrome visible' : 'Chrome headless'),
+            run.options?.mode && MOBILE_EXECUTION_MODE_LABEL[run.options.mode],
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        />
         <Stat
           label="Result"
           value={

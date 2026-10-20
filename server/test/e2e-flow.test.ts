@@ -214,6 +214,44 @@ describe('E2E Flow', () => {
     assert.match(run.failureReason!, /Broken/);
   });
 
+  it('applies the Run choices (show browser, Emulator / Device) over the node settings', async () => {
+    const { repos, ctx, projectId, env, mobileTest } = setup();
+    const { runOptions } = await import('../src/services/flow-run-service');
+    const android = mobileTest('Android: login', [
+      { type: 'fill', selectors: ['id=com.demo:id/email'], value: 'a@b.c' },
+    ]);
+    const flow = repos.flows.save(
+      normalizeFlow(
+        {
+          name: 'Choices',
+          environmentId: env.id,
+          nodes: [node('m', 'mobile', android.id, android.name, { mode: 'emulator' })],
+        },
+        projectId,
+      ),
+    );
+    // Tanpa node web, "show the browser" diabaikan; nilai yang tidak dikenal dibuang.
+    assert.deepEqual(runOptions({ visible: true, mode: 'mock' }, flow), { mode: 'mock' });
+    assert.equal(runOptions({ mode: 'tablet' }, flow), undefined);
+    assert.deepEqual(runOptions({ visible: false }, { nodes: [node('w', 'web', 'x', 'W')] }), {
+      visible: false,
+    });
+
+    const run = (await ctx.flowRuns.wait(
+      ctx.flowRuns.start(flow.id, { run: { visible: true, mode: 'mock' } }).id,
+    ))!;
+    assert.deepEqual(run.options, { mode: 'mock' }, 'the choices are stored on the run');
+    const uiRun = repos.uiRuns.get(run.nodes[0].runId!)!;
+    assert.equal(uiRun.mobile?.mode, 'mock', 'the Run choice wins over the node setting (emulator)');
+    const plain = (await ctx.flowRuns.wait(ctx.flowRuns.start(flow.id).id))!;
+    assert.equal(plain.options, undefined);
+    assert.equal(
+      repos.uiRuns.get(plain.nodes[0].runId!)!.mobile?.mode,
+      'emulator',
+      'node setting without a choice',
+    );
+  });
+
   it('validates the graph', () => {
     const { repos, ctx, projectId, env, scenario } = setup();
     const ok = scenario('OK', '/orders', '{}');

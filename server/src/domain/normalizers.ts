@@ -353,6 +353,9 @@ export function normalizeUiStep(x: Input): UiStep {
     ...(type === 'setVariable' || type === 'saveText' ? { saveAs: variableName(x.saveAs, true) } : {}),
     ...(type === 'saveText' && x.unique ? { unique: true } : {}),
     ...(x.onFailPass && !text(x.retryFrom).trim() ? { onFailPass: true } : {}),
+    ...(Number(x.onFailSkip) > 0 && !x.onFailPass && !text(x.retryFrom).trim()
+      ? { onFailSkip: int(x.onFailSkip, 1, 1, 50) }
+      : {}),
     ...(text(x.retryFrom).trim()
       ? { retryFrom: text(x.retryFrom).trim(), retryMax: int(x.retryMax, 3, 1, 20) }
       : {}),

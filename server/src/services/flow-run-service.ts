@@ -6,8 +6,8 @@
  * option, capture API) diteruskan ke node sesudahnya sebagai {{nama}}.
  * Nilai asli variabel hanya ada di memori; yang disimpan disamarkan.
  */
-import type { E2EFlow, FlowNode, FlowNodeResult, FlowRun, RunTrigger } from '@flowqa/shared';
-import { createId } from '@flowqa/shared';
+import type { E2EFlow, FlowNode, FlowNodeResult, FlowRun, FlowRunOptions, RunTrigger } from '@flowqa/shared';
+import { MOBILE_EXECUTION_MODES, createId } from '@flowqa/shared';
 import { assertProjectEnvironment } from '../domain/guards';
 import { HttpError, notFound } from '../lib/http';
 import { log } from '../lib/log';
@@ -52,6 +52,20 @@ export function validateFlow(
   return [...new Set(problems)];
 }
 
+/**
+ * Pilihan Run yang berlaku: hanya yang dikenal dan relevan dengan node di flow
+ * (tanpa node web, "tampilkan browser" diabaikan). Undefined = tidak ada pilihan.
+ */
+export function runOptions(input: unknown, flow: Pick<E2EFlow, 'nodes'>): FlowRunOptions | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const raw = input as Record<string, unknown>;
+  const out: FlowRunOptions = {};
+  if (typeof raw.visible === 'boolean' && flow.nodes.some((n) => n.kind === 'web')) out.visible = raw.visible;
+  if (MOBILE_EXECUTION_MODES.includes(raw.mode as never) && flow.nodes.some((n) => n.kind === 'mobile'))
+    out.mode = raw.mode as FlowRunOptions['mode'];
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function hasCycle(flow: Pick<E2EFlow, 'nodes' | 'edges'>): boolean {
   const next = new Map<string, string[]>();
   for (const e of flow.edges) next.set(e.from, [...(next.get(e.from) ?? []), e.to]);
@@ -83,7 +97,10 @@ export class FlowRunService {
     return this.active.get(runId);
   }
 
-  start(flowId: string, options: { environmentId?: string | null; trigger?: RunTrigger } = {}): FlowRun {
+  start(
+    flowId: string,
+    options: { environmentId?: string | null; trigger?: RunTrigger; run?: FlowRunOptions } = {},
+  ): FlowRun {
     const flow = this.repos.flows.get(flowId);
     if (!flow) throw notFound('E2E flow');
     const problems = validateFlow(flow, this.repos, flow.projectId);
@@ -98,6 +115,7 @@ export class FlowRunService {
         'Choose an environment: API scenario nodes need one to know which server to call.',
       );
 
+    const choices = runOptions(options.run, flow);
     const now = nowIso();
     const run: FlowRun = {
       id: createId('fr'),
@@ -121,6 +139,7 @@ export class FlowRunService {
       })),
       graph: { nodes: flow.nodes, edges: flow.edges },
       variables: {},
+      ...(choices ? { options: choices } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -307,8 +326,10 @@ export class FlowRunService {
           environmentId,
           trigger: 'flow',
           notify: false,
-          headless: node.kind === 'web' ? !node.config.visible : true,
-          ...(node.kind === 'mobile' && node.config.mode ? { mode: node.config.mode } : {}),
+          headless: node.kind === 'web' ? !(run.options?.visible ?? node.config.visible) : true,
+          ...(node.kind === 'mobile' && (run.options?.mode ?? node.config.mode)
+            ? { mode: run.options?.mode ?? node.config.mode }
+            : {}),
           initialVariables: inputs,
           onVariables: (v) => (variables = v),
           signal,

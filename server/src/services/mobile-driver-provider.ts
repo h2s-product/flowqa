@@ -266,16 +266,21 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
   ): Promise<{ ids: string[]; names: Map<string, { name: string; version: string }> }> {
     const type = this.mode === 'emulator' ? 'emulator' : 'device';
     let devices = await this.probe.devices(this.locks.busyIds());
+    // Serial yang dipasang di test hanya dipakai bila jenisnya sesuai mode yang dipilih saat Run
+    // (test yang direkam di emulator tetap bisa dijalankan di HP, dan sebaliknya).
+    const kindOf = (id: string) =>
+      devices.find((d) => d.id === id)?.type ?? (id.startsWith('emulator-') ? 'emulator' : 'device');
+    const udid = config.udid && kindOf(config.udid) === type ? config.udid : '';
     const pick = () =>
       devices.filter(
         (d) =>
           !d.id.startsWith('avd:') &&
-          (config.udid ? d.id === config.udid : d.type === type) &&
+          (udid ? d.id === udid : d.type === type) &&
           (d.status === 'CONNECTED' || d.status === 'BUSY' || d.status === 'BOOTING'),
       );
     let found = pick();
     // Emulator yang sudah dibuat tetapi belum menyala → nyalakan (tidak pernah membuat AVD baru diam-diam).
-    if (!found.length && this.mode === 'emulator' && !config.udid) {
+    if (!found.length && this.mode === 'emulator' && !udid) {
       const avd = devices.find((d) => d.id.startsWith('avd:') && d.status === 'DISCONNECTED');
       if (avd?.avd) {
         onStatus?.(`Starting the emulator ${avd.avd}…`);
@@ -293,9 +298,7 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
       await this.probe.waitForBoot(d.id);
     }
     if (!found.length) {
-      const unauthorized = devices.find(
-        (d) => d.status === 'UNAUTHORIZED' && (!config.udid || d.id === config.udid),
-      );
+      const unauthorized = devices.find((d) => d.status === 'UNAUTHORIZED' && (!udid || d.id === udid));
       if (unauthorized)
         throw new MobileError(
           'ADB_UNAUTHORIZED',
@@ -306,8 +309,8 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
         );
       throw new MobileError(
         'NO_DEVICE',
-        config.udid
-          ? `The device ${config.udid} set in this test is not connected.`
+        udid
+          ? `The device ${udid} set in this test is not connected.`
           : this.mode === 'emulator'
             ? 'No Android emulator is running or available.'
             : 'No physical Android device is connected over USB.',

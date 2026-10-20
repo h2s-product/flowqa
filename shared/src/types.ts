@@ -1383,6 +1383,12 @@ export interface UiStep {
    */
   onFailPass?: boolean;
   /**
+   * Bila step ini gagal: lewati N step berikutnya lalu lanjut (test tidak gagal).
+   * Untuk bagian yang hanya ada pada keadaan tertentu, mis. tombol "+ Tambah catatan"
+   * yang hanya tampil bila pelanggan belum punya catatan.
+   */
+  onFailSkip?: number;
+  /**
    * Step "apiScenario": scenario API Tester (project yang sama) yang dijalankan.
    * Variabel UI test dikirim sebagai variabel awal; hasil capture kembali ke UI test.
    */
@@ -1651,6 +1657,18 @@ export interface FlowRun extends Timestamps {
   failureReason?: string;
   /** Nama pengguna yang menekan Stop. */
   stoppedBy?: string;
+  /** Pilihan saat Run (menimpa pengaturan node); kosong = mengikuti pengaturan tiap node. */
+  options?: FlowRunOptions;
+}
+
+/**
+ * Pilihan saat menjalankan E2E Flow, berlaku untuk semua node sejenis:
+ * - `visible`: node web dijalankan di jendela Chrome yang terlihat;
+ * - `mode`: node mobile dijalankan di Android Emulator / Android Device (atau Mock).
+ */
+export interface FlowRunOptions {
+  visible?: boolean;
+  mode?: MobileExecutionMode;
 }
 
 /**
