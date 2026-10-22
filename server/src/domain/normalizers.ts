@@ -4,6 +4,10 @@
  * Semua penulisan ke database harus melewati fungsi di sini.
  */
 import type {
+  AppPlatform,
+  FormFactor,
+  MobileExecutionMode,
+  ProjectApp,
   E2EFlow,
   FlowEdge,
   FlowNode,
@@ -35,6 +39,9 @@ import type {
   UiTestCase,
 } from '@flowqa/shared';
 import {
+  APP_PLATFORMS,
+  FORM_FACTORS,
+  serialKind,
   MAX_NOTIFY_RECIPIENTS,
   NOTIFY_WHEN,
   MAX_UI_STEP_DELAY_MS,
@@ -419,8 +426,15 @@ export function normalizeUiTest(input: Input, projectId: string, existing?: UiTe
     viewport: { width: int(viewport.width, 1280, 320, 3840), height: int(viewport.height, 800, 320, 2160) },
     steps,
     ...(target === 'mobile' ? { target, mobile: normalizeMobileApp(input.mobile ?? existing?.mobile) } : {}),
+    ...(appIdOf(input, existing) ? { appId: appIdOf(input, existing) } : {}),
     ...stamps(existing),
   };
+}
+
+/** App test case: dari input bila dikirim (kosong = lepas), selain itu yang lama. */
+function appIdOf(input: Input, existing?: UiTestCase): string | null {
+  if (input.appId === undefined) return existing?.appId ?? null;
+  return text(input.appId).trim().slice(0, 64) || null;
 }
 
 /** Aplikasi & perangkat test mobile. Capabilities tambahan harus berupa objek JSON. */
@@ -578,4 +592,49 @@ function hasFlowCycle(flow: Pick<E2EFlow, 'nodes' | 'edges'>): boolean {
     return false;
   };
   return flow.nodes.some((n) => visit(n.id));
+}
+
+/** Aplikasi project (Android / Web). Platform tidak bisa diubah setelah dibuat. */
+export function normalizeApp(input: Input, projectId: string, existing?: ProjectApp): ProjectApp {
+  const platform: AppPlatform = existing?.platform ?? oneOf(APP_PLATFORMS, input.platform, 'android');
+  const name = required(text(input.name, existing?.name).trim().slice(0, 80), 'name');
+  const base = {
+    id: existing?.id ?? createId('app'),
+    projectId,
+    name,
+    platform,
+    description: text(input.description, existing?.description).trim().slice(0, 500),
+    ...stamps(existing),
+  };
+  if (platform === 'web') {
+    const raw = text(input.urlVariable, existing?.urlVariable ?? '')
+      .trim()
+      .replace(/^\{\{|\}\}$/g, '');
+    if (raw && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(raw))
+      throw new HttpError(400, 'The URL variable must be a variable name such as FARM_URL');
+    const viewport = (input.viewport ?? existing?.viewport ?? {}) as Input;
+    return {
+      ...base,
+      urlVariable: raw,
+      viewport: { width: int(viewport.width, 1280, 320, 3840), height: int(viewport.height, 800, 320, 2160) },
+    };
+  }
+  const a = (input.android ?? existing?.android ?? {}) as Input;
+  const field = (v: unknown) => text(v).trim().slice(0, 500);
+  const defaultMode = MOBILE_EXECUTION_MODES.includes(a.defaultMode as MobileExecutionMode)
+    ? (a.defaultMode as MobileExecutionMode)
+    : '';
+  let udid = field(a.udid).slice(0, 100);
+  if (!defaultMode || defaultMode === 'mock' || (udid && serialKind(udid) !== defaultMode)) udid = '';
+  return {
+    ...base,
+    android: {
+      appPackage: field(a.appPackage),
+      appActivity: field(a.appActivity),
+      app: field(a.app),
+      formFactor: FORM_FACTORS.includes(a.formFactor as FormFactor) ? (a.formFactor as FormFactor) : '',
+      defaultMode,
+      udid,
+    },
+  };
 }

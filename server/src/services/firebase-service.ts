@@ -1,13 +1,17 @@
 /**
- * Firebase App Distribution: setiap release APK baru bisa diunduh & dipasang
- * ke emulator/HP Android — manual (tombol) atau otomatis (cek berkala), lalu
- * opsional menjalankan jadwal Test Scheduler. Kunci Service Account disimpan
- * di server saja; view ke browser hanya memuat email & project-nya.
+ * Firebase App Distribution, per aplikasi Android (ProjectApp): setiap app punya
+ * koneksi sendiri (project number, Android App ID, Service Account). Setiap release APK
+ * baru bisa diunduh & dipasang ke emulator/HP Android — manual (tombol) atau
+ * otomatis (cek berkala), lalu opsional menjalankan jadwal Test Scheduler project
+ * app itu. Kunci Service Account disimpan di server saja; view ke browser hanya
+ * memuat email & project-nya.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import type {
   AndroidDevice,
+  FormFactor,
+  ProjectApp,
   FirebaseEvent,
   FirebaseRelease,
   FirebaseSettings,
@@ -24,8 +28,9 @@ import type { DeviceLockManager } from './device-lock-manager';
 import type { AndroidProbe } from './mobile-driver-provider';
 import type { UiScheduleService } from './ui-schedule-service';
 
-const KEY = 'firebase';
-const STATE_KEY = 'firebase-state';
+/** Koneksi & status per app Android (ProjectApp). */
+export const firebaseKey = (appId: string) => `firebase:app:${appId}`;
+export const firebaseStateKey = (appId: string) => `firebase-state:app:${appId}`;
 const MAX_EVENTS = 30;
 const MIN_INTERVAL = 5;
 const MAX_INTERVAL = 24 * 60;
@@ -67,14 +72,14 @@ const apkName = (r: Pick<RawRelease, 'displayVersion' | 'buildVersion' | 'id'>) 
   `firebase-${`${r.displayVersion || 'v'}-${r.buildVersion || 'b'}-${r.id}`.replace(/[^\w.-]+/g, '_')}.apk`;
 
 export class FirebaseDistributionService {
-  private readonly tokens = new GoogleTokenSource();
-  private readonly client: AppDistributionClient;
+  /** Token Google per app (Service Account berbeda tiap app). */
+  private readonly tokens = new Map<string, GoogleTokenSource>();
+  private readonly clients = new Map<string, AppDistributionClient>();
   private readonly timer: NodeJS.Timeout;
-  private busy: Promise<unknown> | null = null;
+  private readonly busy = new Map<string, Promise<FirebaseEvent>>();
 
   constructor(private readonly deps: FirebaseServiceDeps) {
-    this.client = new AppDistributionClient(this.tokens, deps.apiBase);
-    // Cek setiap menit apakah pengecekan berkala sudah jatuh tempo.
+    // Cek setiap menit apakah pengecekan berkala suatu project sudah jatuh tempo.
     this.timer = setInterval(() => void this.tick().catch(() => {}), 60_000);
     this.timer.unref();
   }
@@ -83,27 +88,46 @@ export class FirebaseDistributionService {
     clearInterval(this.timer);
   }
 
-  /* ------------------------------ settings ------------------------------ */
-
-  private stored(): FirebaseSettings {
-    return { ...EMPTY, ...(this.deps.repos.settings.get<Partial<FirebaseSettings>>(KEY) ?? {}) };
+  private tokenSource(appId: string): GoogleTokenSource {
+    let source = this.tokens.get(appId);
+    if (!source) this.tokens.set(appId, (source = new GoogleTokenSource()));
+    return source;
   }
 
-  private state(): FirebaseState {
+  private client(appId: string): AppDistributionClient {
+    let client = this.clients.get(appId);
+    if (!client)
+      this.clients.set(
+        appId,
+        (client = new AppDistributionClient(this.tokenSource(appId), this.deps.apiBase)),
+      );
+    return client;
+  }
+
+  /* ------------------------------ settings ------------------------------ */
+
+  private stored(appId: string): FirebaseSettings {
+    return {
+      ...EMPTY,
+      ...(this.deps.repos.settings.get<Partial<FirebaseSettings>>(firebaseKey(appId)) ?? {}),
+    };
+  }
+
+  private state(appId: string): FirebaseState {
     return {
       lastSeenRelease: '',
       lastCheckAt: '',
       events: [],
-      ...(this.deps.repos.settings.get<Partial<FirebaseState>>(STATE_KEY) ?? {}),
+      ...(this.deps.repos.settings.get<Partial<FirebaseState>>(firebaseStateKey(appId)) ?? {}),
     };
   }
 
-  private setState(patch: Partial<FirebaseState>) {
-    this.deps.repos.settings.set(STATE_KEY, { ...this.state(), ...patch });
+  private setState(appId: string, patch: Partial<FirebaseState>) {
+    this.deps.repos.settings.set(firebaseStateKey(appId), { ...this.state(appId), ...patch });
   }
 
-  view(): FirebaseSettingsView {
-    const { serviceAccount, ...settings } = this.stored();
+  view(appId: string): FirebaseSettingsView {
+    const { serviceAccount, ...settings } = this.stored(appId);
     let email = '';
     let project = '';
     try {
@@ -115,7 +139,7 @@ export class FirebaseDistributionService {
     } catch {
       /* kunci rusak: dianggap belum ada */
     }
-    const state = this.state();
+    const state = this.state(appId);
     return {
       ...settings,
       serviceAccountEmail: email,
@@ -127,13 +151,14 @@ export class FirebaseDistributionService {
     };
   }
 
-  events(): FirebaseEvent[] {
-    return this.state().events;
+  events(appId: string): FirebaseEvent[] {
+    return this.state(appId).events;
   }
 
   /** Simpan dari form. Key kosong = pertahankan key yang tersimpan. */
-  save(input: Partial<FirebaseSettings>): FirebaseSettingsView {
-    const previous = this.stored();
+  save(appId: string, input: Partial<FirebaseSettings>): FirebaseSettingsView {
+    this.app(appId);
+    const previous = this.stored(appId);
     const text = (v: unknown) => String(v ?? '').trim();
     const serviceAccount = text(input.serviceAccount) || previous.serviceAccount;
     if (serviceAccount) {
@@ -169,48 +194,65 @@ export class FirebaseDistributionService {
         throw new HttpError(400, (error as Error).message);
       }
     }
-    if (next.runSchedule && !this.deps.repos.uiSchedules.get(next.scheduleId))
-      throw new HttpError(400, 'Choose the Test Scheduler schedule to run after installing.');
+    if (
+      next.runSchedule &&
+      this.deps.repos.uiSchedules.get(next.scheduleId)?.projectId !== this.app(appId).projectId
+    )
+      throw new HttpError(
+        400,
+        'Choose the Test Scheduler schedule (of this project) to run after installing.',
+      );
     if (next.autoInstall && !(next.serviceAccount && next.projectNumber && next.appId))
       throw new HttpError(400, 'Connect Firebase first (service account key, project number and App ID).');
-    if (next.serviceAccount !== previous.serviceAccount) this.tokens.reset();
-    this.deps.repos.settings.set(KEY, next);
-    return this.view();
+    if (next.serviceAccount !== previous.serviceAccount) this.tokenSource(appId).reset();
+    this.deps.repos.settings.set(firebaseKey(appId), next);
+    return this.view(appId);
   }
 
-  /** Hapus koneksi Firebase (key ikut dihapus). */
-  reset(): FirebaseSettingsView {
-    this.deps.repos.settings.delete(KEY);
-    this.tokens.reset();
-    return this.view();
+  /** Hapus koneksi Firebase app ini (key ikut dihapus). */
+  reset(appId: string): FirebaseSettingsView {
+    this.deps.repos.settings.delete(firebaseKey(appId));
+    this.tokenSource(appId).reset();
+    return this.view(appId);
   }
 
-  private connection() {
-    const settings = this.stored();
+  /** App / project dihapus: koneksi, riwayat & token ikut dibuang. */
+  forget(appId: string) {
+    this.deps.repos.settings.delete(firebaseKey(appId));
+    this.deps.repos.settings.delete(firebaseStateKey(appId));
+    this.tokens.delete(appId);
+    this.clients.delete(appId);
+  }
+
+  private connection(appId: string) {
+    const settings = this.stored(appId);
     if (!settings.serviceAccount || !settings.projectNumber || !settings.appId)
       throw new HttpError(
         400,
-        'Connect Firebase first: upload the service account key and enter the project number and App ID.',
+        `Connect Firebase for "${this.deps.repos.apps.get(appId)?.name ?? 'this app'}" first: upload its service account key and enter the project number and App ID (Apps → the app → Firebase).`,
       );
     return { settings, key: parseServiceAccount(settings.serviceAccount) };
   }
 
-  private event(kind: FirebaseEvent['kind'], ok: boolean, message: string, release?: string) {
+  private event(appId: string, kind: FirebaseEvent['kind'], ok: boolean, message: string, release?: string) {
     const events = [
       { at: nowIso(), kind, ok, message, ...(release ? { release } : {}) },
-      ...this.state().events,
+      ...this.state(appId).events,
     ].slice(0, MAX_EVENTS);
-    this.setState({ events });
-    (ok ? log.info : log.warn)(`[firebase] ${message}`);
+    this.setState(appId, { events });
+    const app = this.deps.repos.apps.get(appId)?.name ?? appId;
+    (ok ? log.info : log.warn)(`[firebase] ${app}: ${message}`);
   }
 
   /* ------------------------------ releases ------------------------------ */
 
-  private async rawReleases(): Promise<RawRelease[]> {
-    const { settings, key } = this.connection();
-    return this.client.releases(key, settings.projectNumber, settings.appId).catch((error) => {
-      throw error instanceof FirebaseError ? new HttpError(502, error.message) : error;
-    });
+  private async rawReleases(appId: string): Promise<RawRelease[]> {
+    const { settings, key } = this.connection(appId);
+    return this.client(appId)
+      .releases(key, settings.projectNumber, settings.appId)
+      .catch((error) => {
+        throw error instanceof FirebaseError ? new HttpError(502, error.message) : error;
+      });
   }
 
   private present(r: RawRelease): FirebaseRelease {
@@ -219,22 +261,28 @@ export class FirebaseDistributionService {
     return { ...release, downloaded: fs.existsSync(file), ...(fs.existsSync(file) ? { apkPath: file } : {}) };
   }
 
-  async releases(): Promise<FirebaseRelease[]> {
-    return (await this.rawReleases()).map((r) => this.present(r));
+  async releases(appId: string): Promise<FirebaseRelease[]> {
+    return (await this.rawReleases(appId)).map((r) => this.present(r));
   }
 
   /** Test connection: token + daftar release. */
   async test(
+    appId: string,
     input?: Partial<FirebaseSettings>,
   ): Promise<{ ok: boolean; message: string; latest?: FirebaseRelease }> {
     try {
-      const stored = this.stored();
+      const stored = this.stored(appId);
       const serviceAccount = String(input?.serviceAccount ?? '').trim() || stored.serviceAccount;
       const projectNumber = String(input?.projectNumber ?? stored.projectNumber).trim();
-      const appId = String(input?.appId ?? stored.appId).trim();
+      const firebaseAppId = String(input?.appId ?? stored.appId).trim();
       if (!serviceAccount) return { ok: false, message: 'Upload the service account key (JSON) first.' };
       const key = parseServiceAccount(serviceAccount);
-      const releases = await this.client.releases(key, projectNumber, appId, 1);
+      // Key baru dari form: token sementara, supaya token app yang tersimpan tidak tertukar.
+      const client =
+        serviceAccount === stored.serviceAccount
+          ? this.client(appId)
+          : new AppDistributionClient(new GoogleTokenSource(), this.deps.apiBase);
+      const releases = await client.releases(key, projectNumber, firebaseAppId, 1);
       const latest = releases[0] ? this.present(releases[0]) : undefined;
       return {
         ok: true,
@@ -248,8 +296,8 @@ export class FirebaseDistributionService {
     }
   }
 
-  private async resolveRelease(id: string): Promise<RawRelease> {
-    const releases = await this.rawReleases();
+  private async resolveRelease(appId: string, id: string): Promise<RawRelease> {
+    const releases = await this.rawReleases(appId);
     const release = id === 'latest' ? releases[0] : releases.find((r) => r.id === id || r.name === id);
     if (!release)
       throw new HttpError(
@@ -260,23 +308,24 @@ export class FirebaseDistributionService {
   }
 
   /** Unduh APK release ke folder APK Testora (dilewati bila sudah ada). */
-  async download(id: string): Promise<UploadedApk & { release: string }> {
-    const release = await this.resolveRelease(id);
+  async download(appId: string, id: string): Promise<UploadedApk & { release: string }> {
+    const release = await this.resolveRelease(appId, id);
     const label = `${release.displayVersion} (${release.buildVersion})`;
     const file = path.join(this.deps.apkDir(), apkName(release));
     if (!fs.existsSync(file)) {
       try {
-        const data = await this.client.download(release.downloadUri);
+        const data = await this.client(appId).download(release.downloadUri);
         fs.mkdirSync(this.deps.apkDir(), { recursive: true });
         fs.writeFileSync(file, data);
         this.event(
+          appId,
           'download',
           true,
           `Downloaded ${label} (${(data.length / 1024 / 1024).toFixed(1)} MB)`,
           label,
         );
       } catch (error) {
-        this.event('error', false, `Download of ${label} failed: ${(error as Error).message}`, label);
+        this.event(appId, 'error', false, `Download of ${label} failed: ${(error as Error).message}`, label);
         throw new HttpError(502, (error as Error).message);
       }
     }
@@ -289,48 +338,69 @@ export class FirebaseDistributionService {
     };
   }
 
-  /** Path APK release terbaru (diunduh bila perlu) — untuk "firebase:latest". */
-  async latestApk(): Promise<string> {
-    return (await this.download('latest')).path;
+  /** Path APK release terbaru app ini (diunduh bila perlu) — untuk "firebase:latest". */
+  async latestApk(appId: string): Promise<string> {
+    return (await this.download(appId, 'latest')).path;
   }
 
-  /** Pilih perangkat tujuan: serial tertentu, atau yang pertama siap untuk mode itu. */
-  private async target(mode: 'emulator' | 'device', udid: string): Promise<AndroidDevice> {
+  /**
+   * Pilih perangkat tujuan: serial tertentu, atau yang pertama siap untuk mode itu
+   * dan jenis perangkat app (phone / tablet; perangkat yang jenisnya tak terdeteksi tetap boleh).
+   */
+  private async target(
+    mode: 'emulator' | 'device',
+    udid: string,
+    formFactor: FormFactor | '',
+  ): Promise<AndroidDevice> {
     const devices = await this.deps.probe.devices(this.deps.locks.busyIds());
     const pick = devices.filter(
       (d) =>
         !d.id.startsWith('avd:') &&
-        (udid ? d.id === udid : d.type === mode) &&
+        (udid
+          ? d.id === udid
+          : d.type === mode && (!formFactor || !d.formFactor || d.formFactor === formFactor)) &&
         (d.status === 'CONNECTED' || d.status === 'BUSY'),
     );
+    const what =
+      `${mode === 'device' ? 'Android' : 'emulator'} ${formFactor || (mode === 'device' ? 'phone' : '')}`.trim();
     if (!pick.length)
       throw new HttpError(
         409,
         udid
           ? `The device ${udid} is not connected.`
-          : `No ${mode === 'device' ? 'Android phone is connected' : 'Android emulator is running'}. Start one in Settings → Mobile (Android) → Devices.`,
+          : mode === 'device'
+            ? `No ${what === 'Android' ? 'Android phone' : what} is connected. Plug it in over USB with USB debugging on.`
+            : `No ${what} is running. Start one in Settings → Mobile (Android) → Devices.`,
       );
     return pick[0];
   }
 
   /** Unduh (bila perlu) lalu pasang release ke perangkat. Perangkat dikunci selama pemasangan. */
   async install(
+    appId: string,
     id: string,
     input: { mode?: unknown; udid?: unknown } = {},
   ): Promise<{ release: string; device: string }> {
-    const settings = this.stored();
+    const settings = this.stored(appId);
     const mode =
       input.mode === 'device' ? 'device' : input.mode === 'emulator' ? 'emulator' : settings.installMode;
     const udid = typeof input.udid === 'string' ? input.udid : input.mode ? '' : settings.udid;
-    const apk = await this.download(id);
-    const device = await this.target(mode, udid);
+    const apk = await this.download(appId, id);
+    const device = await this.target(mode, udid, this.app(appId).android?.formFactor ?? '');
     const lease = await this.deps.locks.acquire([device.id], `Firebase install ${apk.release}`);
     try {
       await this.deps.probe.installApk(device.id, apk.path);
-      this.event('install', true, `Installed ${apk.release} on ${device.name} (${device.id})`, apk.release);
+      this.event(
+        appId,
+        'install',
+        true,
+        `Installed ${apk.release} on ${device.name} (${device.id})`,
+        apk.release,
+      );
       return { release: apk.release, device: `${device.name} (${device.id})` };
     } catch (error) {
       this.event(
+        appId,
         'error',
         false,
         `Install of ${apk.release} on ${device.name} failed: ${(error as Error).message}`,
@@ -345,11 +415,21 @@ export class FirebaseDistributionService {
   /* ------------------------------ otomatis ------------------------------ */
 
   private async tick() {
-    const settings = this.stored();
-    if (!settings.autoInstall || this.busy) return;
-    const last = this.state().lastCheckAt;
-    if (last && Date.now() - new Date(last).getTime() < settings.intervalMinutes * 60_000) return;
-    await this.checkNow();
+    for (const app of this.deps.repos.apps.list()) {
+      if (app.platform !== 'android') continue;
+      const settings = this.stored(app.id);
+      if (!settings.autoInstall || this.busy.has(app.id)) continue;
+      const last = this.state(app.id).lastCheckAt;
+      if (last && Date.now() - new Date(last).getTime() < settings.intervalMinutes * 60_000) continue;
+      await this.checkNow(app.id).catch(() => {});
+    }
+  }
+
+  /** App Android pemilik koneksi. */
+  private app(appId: string): ProjectApp {
+    const app = this.deps.repos.apps.get(appId);
+    if (!app || app.platform !== 'android') throw new HttpError(404, 'Android app not found');
+    return app;
   }
 
   /**
@@ -357,43 +437,46 @@ export class FirebaseDistributionService {
    * jalankan jadwal. Release pertama yang terlihat setelah koneksi dibuat juga
    * diproses, supaya perangkat langsung memakai versi terbaru.
    */
-  checkNow(): Promise<FirebaseEvent> {
-    if (this.busy) return this.busy as Promise<FirebaseEvent>;
+  checkNow(appId: string): Promise<FirebaseEvent> {
+    const running = this.busy.get(appId);
+    if (running) return running;
+    const latestEvent = () => this.state(appId).events[0];
     const job = (async (): Promise<FirebaseEvent> => {
-      this.setState({ lastCheckAt: nowIso() });
-      const settings = this.stored();
+      this.setState(appId, { lastCheckAt: nowIso() });
+      const settings = this.stored(appId);
       let latest: RawRelease | undefined;
       try {
-        latest = (await this.rawReleases())[0];
+        latest = (await this.rawReleases(appId))[0];
       } catch (error) {
-        this.event('error', false, `Checking Firebase failed: ${(error as Error).message}`);
-        return this.state().events[0];
+        this.event(appId, 'error', false, `Checking Firebase failed: ${(error as Error).message}`);
+        return latestEvent();
       }
       if (!latest) {
-        this.event('check', true, 'No releases in Firebase yet.');
-        return this.state().events[0];
+        this.event(appId, 'check', true, 'No releases in Firebase yet.');
+        return latestEvent();
       }
       const label = `${latest.displayVersion} (${latest.buildVersion})`;
-      if (latest.name === this.state().lastSeenRelease) {
-        this.event('check', true, `No new release. Latest is still ${label}.`, label);
-        return this.state().events[0];
+      if (latest.name === this.state(appId).lastSeenRelease) {
+        this.event(appId, 'check', true, `No new release. Latest is still ${label}.`, label);
+        return latestEvent();
       }
-      this.event('check', true, `New release found: ${label}.`, label);
+      this.event(appId, 'check', true, `New release found: ${label}.`, label);
       try {
-        await this.install(latest.id, { mode: settings.installMode, udid: settings.udid });
+        await this.install(appId, latest.id, { mode: settings.installMode, udid: settings.udid });
       } catch {
         // Dicatat oleh install(); release belum ditandai "terlihat" supaya dicoba lagi berikutnya.
-        return this.state().events[0];
+        return latestEvent();
       }
-      this.setState({ lastSeenRelease: latest.name });
+      this.setState(appId, { lastSeenRelease: latest.name });
       if (settings.runSchedule) {
         const schedule = this.deps.repos.uiSchedules.get(settings.scheduleId);
-        if (!schedule)
-          this.event('error', false, 'The schedule to run after installing no longer exists.', label);
+        if (!schedule || schedule.projectId !== this.app(appId).projectId)
+          this.event(appId, 'error', false, 'The schedule to run after installing no longer exists.', label);
         else
           try {
             const { queued } = this.deps.schedules().run(schedule, { mode: settings.installMode });
             this.event(
+              appId,
               'schedule',
               true,
               `Started "${schedule.name}" (${queued} test${queued === 1 ? '' : 's'}) on ${label}.`,
@@ -401,6 +484,7 @@ export class FirebaseDistributionService {
             );
           } catch (error) {
             this.event(
+              appId,
               'error',
               false,
               `Could not start "${schedule.name}": ${(error as Error).message}`,
@@ -408,11 +492,11 @@ export class FirebaseDistributionService {
             );
           }
       }
-      return this.state().events[0];
+      return latestEvent();
     })().finally(() => {
-      this.busy = null;
+      this.busy.delete(appId);
     });
-    this.busy = job;
+    this.busy.set(appId, job);
     return job;
   }
 }

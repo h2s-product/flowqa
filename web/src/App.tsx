@@ -4,6 +4,7 @@ import { ApiCatalogPage } from './features/apis/ApiCatalogPage';
 import { ScenarioBuilderPage } from './features/builder/ScenarioBuilderPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { EnvironmentsPage } from './features/environments/EnvironmentsPage';
+import { AppsPage } from './features/apps/AppsPage';
 import { PerfRunDetailPage } from './features/performance/PerfRunDetailPage';
 import { PerformancePage } from './features/performance/PerformancePage';
 import { ProjectOverviewPage } from './features/projects/ProjectOverviewPage';
@@ -38,6 +39,7 @@ export function App() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:projectId" element={<ProjectOverviewPage />} />
         <Route path="environments" element={<EnvironmentsPage />} />
+        <Route path="apps" element={<AppsPage />} />
         <Route path="apis" element={<ApiCatalogPage />} />
         <Route path="scenarios" element={<ScenariosPage />} />
         <Route path="scenarios/:scenarioId" element={<ScenarioBuilderPage />} />

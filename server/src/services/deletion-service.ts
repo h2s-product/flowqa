@@ -23,13 +23,19 @@ export interface RunDeletionResult {
 }
 
 export class DeletionService {
-  constructor(private readonly repos: Repositories) {}
+  constructor(
+    private readonly repos: Repositories,
+    /** Pengaturan di luar tabel project (mis. koneksi Firebase app-nya) ikut dibuang. */
+    private readonly onProjectDeleted?: (projectId: string, appIds: string[]) => void,
+  ) {}
 
   /** Hapus project; tabel turunan ikut terhapus (ON DELETE CASCADE), file screenshot dibersihkan di sini. */
   deleteProject(projectId: string): boolean {
     const uiRunIds = this.repos.uiRuns.idsForProject(projectId);
+    const appIds = this.repos.apps.list({ project_id: projectId }).map((a) => a.id);
     if (!this.repos.projects.delete(projectId)) return false;
     uiRunIds.forEach((id) => this.removeUiArtifacts(id));
+    this.onProjectDeleted?.(projectId, appIds);
     return true;
   }
 

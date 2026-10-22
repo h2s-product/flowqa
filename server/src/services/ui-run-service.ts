@@ -37,6 +37,7 @@ import { assertProjectEnvironment } from '../domain/guards';
 import { AppiumError } from '../engine/mobile/appium-client';
 import { CapabilityError } from '../engine/mobile/capabilities';
 import { executeMobileStep, explainMobileError } from '../engine/mobile/mobile-executor';
+import type { AppService } from './app-service';
 import type { AppiumSettingsService } from './appium-settings-service';
 import { MobileError, type MobileProviders } from './mobile-driver-provider';
 import { log } from '../lib/log';
@@ -108,6 +109,8 @@ export class UiRunService {
     private readonly appium?: AppiumSettingsService,
     /** Mock / Android Emulator / Android Device. */
     private readonly mobileProviders?: MobileProviders,
+    /** App project: mode & serial bawaan, phone/tablet, Firebase. */
+    private readonly apps?: AppService,
   ) {}
 
   start(
@@ -145,7 +148,9 @@ export class UiRunService {
 
     const now = nowIso();
     const mobile = isMobile;
-    const mode: MobileExecutionMode = options.mode ?? this.appium?.current().defaultMode ?? 'emulator';
+    // Pilihan saat Run → bawaan app → bawaan Settings → Appium.
+    const mode: MobileExecutionMode =
+      this.apps?.mode(test, options.mode) ?? options.mode ?? this.appium?.current().defaultMode ?? 'emulator';
     // Aplikasi mobile selalu tampil di perangkat/emulator; "headless" hanya berlaku untuk web.
     const headless = mobile ? false : (options.headless ?? true);
     const run: UiRun = {
@@ -462,7 +467,9 @@ export class UiRunService {
     ];
     const acquiring = this.mobileProviders.get(mode).acquire({
       signal: vars.signal,
-      config: test.mobile,
+      appId: test.appId ?? undefined,
+      formFactor: this.apps?.formFactor(test) || undefined,
+      config: this.apps?.config(test, test.mobile, mode) ?? test.mobile,
       resolve,
       owner: `UI run ${run.id}`,
       secrets,

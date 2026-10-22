@@ -4,6 +4,7 @@ import type { MobileErrorCode, MobileExecutionMode } from '@flowqa/shared';
 import { MOBILE_EXECUTION_MODE_LABEL } from '@flowqa/shared';
 import { Icon } from '@/components/Icon';
 import { Segmented } from '@/components/ui';
+import { useWorkspace } from '@/context/WorkspaceContext';
 
 const MODE_KEY = 'testora.mobileMode';
 export const MODE_OPTIONS = (['mock', 'emulator', 'device'] as const).map((id) => ({
@@ -11,20 +12,30 @@ export const MODE_OPTIONS = (['mock', 'emulator', 'device'] as const).map((id) =
   label: MOBILE_EXECUTION_MODE_LABEL[id],
 }));
 
-/** Mode eksekusi test mobile yang terakhir dipilih (per browser). */
-export function useExecutionMode(): [MobileExecutionMode, (mode: MobileExecutionMode) => void] {
-  const [mode, setMode] = useState<MobileExecutionMode>(() => {
+/**
+ * Mode eksekusi test mobile. Pilihan awal: mode bawaan app test itu (Apps), lalu
+ * pilihan terakhir di browser ini untuk project yang aktif, lalu Android Emulator.
+ */
+export function useExecutionMode(
+  appDefault?: MobileExecutionMode | '',
+): [MobileExecutionMode, (mode: MobileExecutionMode) => void] {
+  const { projectId = '' } = useWorkspace();
+  const key = `${MODE_KEY}.${projectId}`;
+  const [chosen, setChosen] = useState<{ projectId: string; mode: MobileExecutionMode } | null>(null);
+  const remembered = (): MobileExecutionMode | undefined => {
     try {
-      const saved = localStorage.getItem(MODE_KEY);
-      return saved === 'mock' || saved === 'device' ? saved : 'emulator';
+      const saved = localStorage.getItem(key) ?? localStorage.getItem(MODE_KEY);
+      return saved === 'mock' || saved === 'device' || saved === 'emulator' ? saved : undefined;
     } catch {
-      return 'emulator';
+      return undefined;
     }
-  });
+  };
+  const mode =
+    (chosen?.projectId === projectId ? chosen.mode : undefined) || appDefault || remembered() || 'emulator';
   const set = (next: MobileExecutionMode) => {
-    setMode(next);
+    setChosen({ projectId, mode: next });
     try {
-      localStorage.setItem(MODE_KEY, next);
+      localStorage.setItem(key, next);
     } catch {
       // Penyimpanan browser tidak tersedia: pilihan hanya berlaku di halaman ini.
     }

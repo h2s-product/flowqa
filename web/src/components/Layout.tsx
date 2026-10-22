@@ -42,6 +42,7 @@ const SETTINGS_NAV: NavGroup = {
 const SHARED_NAV: NavItem[] = [
   { to: '/projects', label: 'Projects', icon: 'folder' },
   { to: '/environments', label: 'Environments', icon: 'globe' },
+  { to: '/apps', label: 'Apps', icon: 'phone' },
 ];
 
 const NAV: Record<ProductMode, NavEntry[]> = {
@@ -82,6 +83,7 @@ const TITLES: [RegExp, string][] = [
   [/^\/projects\/[^/]+/, 'Project overview'],
   [/^\/projects/, 'Projects'],
   [/^\/environments/, 'Environments'],
+  [/^\/apps/, 'Apps'],
   [/^\/apis/, 'API Catalog'],
   [/^\/scenarios\/[^/]+/, 'Scenario builder'],
   [/^\/scenarios/, 'Test Scenarios'],

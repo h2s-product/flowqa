@@ -9,20 +9,21 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { AndroidDevice, MobileAppConfig, UiStep } from '@flowqa/shared';
-import { SECRET_MASK } from '@flowqa/shared';
+import { SECRET_MASK, formFactorOf } from '@flowqa/shared';
 import { fakeAppium } from './fake-appium';
 
 process.env.FLOWQA_UI_ARTIFACTS = path.join(os.tmpdir(), `mobile-artifacts-${process.pid}`);
 const { openDatabase } = await import('../src/db/database');
 const { createRepositories } = await import('../src/repositories');
-const { normalizeProject, normalizeUiStep, normalizeUiTest } = await import('../src/domain/normalizers');
+const { normalizeEnvironment, normalizeProject, normalizeUiStep, normalizeUiTest } =
+  await import('../src/domain/normalizers');
 const { createAppContext } = await import('../src/app-context');
 const { describeSelector, toLocator } = await import('../src/engine/mobile/locators');
 const { parsePageSource } = await import('../src/engine/mobile/page-source');
 const { buildCapabilities } = await import('../src/engine/mobile/capabilities');
 const { randomPolygon } = await import('../src/engine/mobile/mobile-executor');
 const { chooseComponents, parseSdkList } = await import('../src/engine/android/sdk');
-const { parseAdbDevices } = await import('../src/engine/android/devices');
+const { avdFormFactor, parseAdbDevices, parseWm } = await import('../src/engine/android/devices');
 const { maskSecrets } = await import('../src/engine/android/toolchain');
 const { dynamicGenerators } = await import('../src/engine/dynamic-variables');
 const { DeviceLockManager } = await import('../src/services/device-lock-manager');
@@ -433,6 +434,171 @@ describe('Android runs, Mock & Real mode, Mobile Inspector', () => {
     assert.equal(onPhone.mobile?.udid, 'R58N1', 'an emulator serial does not override "Device"');
     const same = (await ctx.uiRuns.wait(ctx.uiRuns.start(pinned('R58N1').id, { mode: 'device' }).id))!;
     assert.equal(same.mobile?.udid, 'R58N1', 'a serial of the chosen type is still used');
+  });
+
+  it('uses the device of the app: phone / tablet, default mode & device', async () => {
+    const phone: AndroidDevice = {
+      ...EMULATOR,
+      id: 'R58N1',
+      type: 'device',
+      connection: 'USB',
+      formFactor: 'phone',
+    };
+    const tablet: AndroidDevice = {
+      ...EMULATOR,
+      id: 'R58T9',
+      type: 'device',
+      connection: 'USB',
+      formFactor: 'tablet',
+    };
+    const { repos, ctx, projectId } = setup([{ ...EMULATOR, formFactor: 'phone' }, phone, tablet]);
+    const fo = ctx.apps.save(projectId, {
+      name: 'FO Apps',
+      platform: 'android',
+      android: { formFactor: 'phone' },
+    });
+    const agro = ctx.apps.save(projectId, {
+      name: 'Agro Apps',
+      platform: 'android',
+      android: { formFactor: 'tablet', defaultMode: 'device' },
+    });
+    // Serial yang tidak sejenis dengan mode dibuang saat disimpan.
+    assert.equal(
+      ctx.apps.save(projectId, { android: { defaultMode: 'emulator', udid: 'R58N1' } }, fo).android?.udid,
+      '',
+    );
+    const make = (appId: string | null, udid = '') =>
+      repos.uiTests.save(
+        normalizeUiTest(
+          { name: 'Login', target: 'mobile', appId, mobile: { ...APP, udid }, steps: loginSteps() },
+          projectId,
+        ),
+      );
+    const run = async (id: string, mode?: 'emulator' | 'device') =>
+      (await ctx.uiRuns.wait(ctx.uiRuns.start(id, mode ? { mode } : {}).id))!;
+
+    const onTablet = await run(make(agro.id).id);
+    assert.equal(onTablet.mobile?.mode, 'device', 'the app default mode is used');
+    assert.equal(onTablet.mobile?.udid, 'R58T9', 'Agro Apps runs on the tablet, not the phone');
+    const onPhone = await run(make(fo.id).id, 'device');
+    assert.equal(onPhone.mobile?.udid, 'R58N1', 'FO Apps runs on the phone');
+    const pinned = await run(make(agro.id, 'R58N1').id);
+    assert.equal(pinned.mobile?.udid, 'R58N1', 'a device set in the test case still wins');
+    const fixed = ctx.apps.save(
+      projectId,
+      { android: { formFactor: 'tablet', defaultMode: 'device', udid: 'R58T9' } },
+      agro,
+    );
+    assert.equal(fixed.android?.udid, 'R58T9');
+    const chosen = await run(make(agro.id).id, 'emulator');
+    assert.equal(chosen.mobile?.mode, 'emulator', 'the choice made at Run wins over the app default');
+    const plain = await run(make(null).id);
+    assert.equal(plain.mobile?.mode, 'emulator', 'tests without an app keep the Settings default');
+    // App test case harus sejenis: test web tidak bisa memakai app Android.
+    assert.throws(
+      () =>
+        ctx.apps.assertForTest(
+          normalizeUiTest({ name: 'Web', startUrl: 'https://x.test', appId: agro.id, steps: [] }, projectId),
+        ),
+      /Android app/,
+    );
+  });
+
+  it('creates apps from the existing test cases once, named after their folders', () => {
+    const repos = createRepositories(openDatabase(':memory:'));
+    const projectId = repos.projects.save(normalizeProject({ name: 'MAXXI ALSINTAN' })).id;
+    const folder = (name: string, parentId: string | null = null) =>
+      repos.uiFolders.save({
+        id: `fld_${name.replace(/\W/g, '')}`,
+        projectId,
+        parentId,
+        name,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      } as never);
+    const root = folder('ALSINTAN');
+    const sales = folder('SALES APP', root.id);
+    const bo = folder('BACKOFFICE', root.id);
+    const env = repos.environments.list({ project_id: projectId })[0];
+    repos.environments.save(
+      normalizeEnvironment(
+        {
+          name: 'Development',
+          baseUrl: 'https://api.example.test',
+          variables: [{ key: 'WEB_URL', value: 'https://bo.example.test/' }],
+        },
+        projectId,
+        env,
+      ),
+    );
+    const mobile = repos.uiTests.save(
+      normalizeUiTest(
+        {
+          name: 'Login',
+          target: 'mobile',
+          folderId: sales.id,
+          mobile: { ...APP, app: 'firebase:latest' },
+          steps: loginSteps(),
+        },
+        projectId,
+      ),
+    );
+    const web1 = repos.uiTests.save(
+      normalizeUiTest({ name: 'Dash', folderId: bo.id, startUrl: '{{WEB_URL}}', steps: [] }, projectId),
+    );
+    const web2 = repos.uiTests.save(
+      normalizeUiTest(
+        { name: 'Login BO', folderId: bo.id, startUrl: 'https://bo.example.test/login', steps: [] },
+        projectId,
+      ),
+    );
+    repos.settings.set(`android-project:${projectId}`, { defaultMode: 'device', udid: '' });
+    const ctx = createAppContext(repos, undefined as never, null, fakeProbe([EMULATOR]));
+    const apps = ctx.apps.list(projectId);
+    assert.deepEqual(
+      apps.map((a) => [a.platform, a.name]),
+      [
+        ['android', 'SALES APP'],
+        ['web', 'BACKOFFICE'],
+      ],
+    );
+    const [android, web] = apps;
+    assert.equal(android.android?.appPackage, 'com.demo');
+    assert.equal(android.android?.app, 'firebase:latest');
+    assert.equal(android.android?.defaultMode, 'device', 'the old project default moves to the app');
+    assert.equal(web.urlVariable, 'WEB_URL', 'a literal URL is matched to its environment variable');
+    assert.equal(repos.uiTests.get(mobile.id)?.appId, android.id);
+    assert.equal(repos.uiTests.get(web1.id)?.appId, web.id);
+    assert.equal(repos.uiTests.get(web2.id)?.appId, web.id);
+    // Hanya sekali: app yang dihapus tidak dibuat lagi saat server mulai berikutnya.
+    ctx.apps.delete(projectId, web.id);
+    assert.equal(repos.uiTests.get(web1.id)?.appId, undefined, 'its tests stay, without an app');
+    createAppContext(repos, undefined as never, null, fakeProbe([EMULATOR]));
+    assert.equal(ctx.apps.list(projectId).length, 1);
+  });
+
+  it('tells phones from tablets by screen size', () => {
+    assert.deepEqual(parseWm('Physical size: 1080x2400\n', 'Physical density: 420\n'), {
+      width: 1080,
+      height: 2400,
+      density: 420,
+    });
+    assert.equal(formFactorOf({ ...parseWm('Physical size: 1080x2400', 'Physical density: 420') }), 'phone');
+    assert.equal(formFactorOf({ ...parseWm('Physical size: 1600x2560', 'Physical density: 320') }), 'tablet');
+    assert.equal(
+      formFactorOf({
+        ...parseWm('Physical size: 1600x2560\nOverride size: 1080x1920', 'Physical density: 320'),
+      }),
+      'phone',
+      'an override size is what apps see',
+    );
+    assert.equal(formFactorOf({ characteristics: 'tablet' }), 'tablet');
+    assert.equal(formFactorOf({}), undefined);
+    assert.equal(avdFormFactor({ 'hw.device.name': 'pixel_tablet' }), 'tablet');
+    assert.equal(
+      avdFormFactor({ 'hw.lcd.width': '1080', 'hw.lcd.height': '2400', 'hw.lcd.density': '420' }),
+      'phone',
+    );
   });
 
   it('marks runs that cannot start as ERROR with an actionable code', async () => {

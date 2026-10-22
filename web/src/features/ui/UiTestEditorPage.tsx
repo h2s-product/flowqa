@@ -11,6 +11,7 @@ import {
   SORT_ORDERS,
 } from '@flowqa/shared';
 import {
+  useApps,
   useFolders,
   useRunUiTestAndOpen,
   useSaveUiTest,
@@ -39,6 +40,7 @@ import {
   testTarget,
 } from './uiSteps';
 import { EMPTY_MOBILE_APP, MobileAppFields, mobileAppReady } from './MobileAppFields';
+import { AppSelect } from '@/features/apps/AppSelect';
 import { ExecutionModePicker, useExecutionMode } from './mobileMode';
 import { useEditableCopy } from '@/hooks/useEditableCopy';
 import { ApiScenarioStepFields } from './ApiScenarioStepFields';
@@ -62,7 +64,9 @@ export function UiTestEditorPage() {
   const [open, setOpen] = useState<string | null>(null);
   const folderIndex = useMemo(() => indexFolders(folders, []), [folders]);
 
-  const [mode, setMode] = useExecutionMode();
+  const { data: apps = [] } = useApps(projectId);
+  const testApp = apps.find((a) => a.id === draft?.appId);
+  const [mode, setMode] = useExecutionMode(testApp?.android?.defaultMode);
 
   if (isLoading || (test && !draft)) return <Loading />;
   if (error || !test || !draft) return <ErrorBox error={error} />;
@@ -203,6 +207,36 @@ export function UiTestEditorPage() {
                 />
               </Field>
             </div>
+            <Field
+              label="App"
+              hint={
+                testApp?.platform === 'android'
+                  ? `Runs on ${testApp.android?.formFactor ? `a ${testApp.android.formFactor}` : 'a phone or tablet'}. “Latest Firebase release” uses the Firebase connection of ${testApp.name}.`
+                  : testApp?.platform === 'web' && testApp.urlVariable
+                    ? `Start URL of ${testApp.name}: {{${testApp.urlVariable}}}`
+                    : 'Link the test to an app of the project (set up in Apps).'
+              }
+            >
+              <AppSelect
+                projectId={projectId}
+                platform={mobile ? 'android' : 'web'}
+                value={draft.appId}
+                onChange={(app) => {
+                  const patch: Partial<UiTestCase> = { appId: app?.id ?? null };
+                  // Isian yang masih kosong diisi dari app.
+                  if (app?.android && mobile && !draft.mobile?.appPackage && !draft.mobile?.app)
+                    patch.mobile = {
+                      ...(draft.mobile ?? EMPTY_MOBILE_APP),
+                      appPackage: app.android.appPackage,
+                      appActivity: app.android.appActivity,
+                      app: app.android.app,
+                    };
+                  if (app?.platform === 'web' && app.urlVariable && !draft.startUrl.trim())
+                    patch.startUrl = `{{${app.urlVariable}}}`;
+                  set(patch);
+                }}
+              />
+            </Field>
             <Field label="Description">
               <input
                 className="in"

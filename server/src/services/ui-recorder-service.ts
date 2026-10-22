@@ -56,6 +56,8 @@ const recordedDelay = (type: string, gapMs: number) =>
   );
 
 interface Session extends RecordingSession {
+  /** App web project yang direkam (test baru ikut dihubungkan ke app ini). */
+  appId?: string | null;
   browser?: Browser;
   page?: Page;
   environment: Environment;
@@ -112,6 +114,7 @@ export class UiRecorderService {
       startUrl?: unknown;
       folderId?: unknown;
       testCaseId?: unknown;
+      appId?: unknown;
       environmentId?: unknown;
       login?: unknown;
       /** Simpan URL/login yang diketik sebagai variabel environment untuk rekaman berikutnya. */
@@ -154,7 +157,14 @@ export class UiRecorderService {
     const resolve = variableResolver(environment);
     const url = resolve(startUrl);
 
+    const appId = existing?.appId ?? (input.appId ? String(input.appId) : null);
+    if (appId && !existing) {
+      const app = this.repos.apps.get(appId);
+      if (!app || app.projectId !== projectId || app.platform !== 'web')
+        throw new HttpError(400, 'Choose a web app of this project');
+    }
     const session: Session = {
+      appId,
       id: createId('rec'),
       projectId,
       testCaseId: existing?.id ?? null,
@@ -375,6 +385,7 @@ export class UiRecorderService {
         {
           name: input.name ?? session.name,
           startUrl: session.startUrl,
+          ...(session.appId ? { appId: session.appId } : {}),
           folderId: input.folderId !== undefined ? input.folderId : session.folderId,
           steps: session.steps,
         },
