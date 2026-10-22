@@ -41,6 +41,7 @@ export function uiTestRoutes(ctx: AppContext): Router {
       requireProject(ctx, res, req.params.projectId);
       const test = normalizeUiTest(req.body ?? {}, req.params.projectId);
       ctx.uiFolders.assertFolder(test.projectId, test.folderId);
+      ctx.apps.assertForTest(test);
       res.status(201).json(presentUiTest(tests.save(test)));
     }),
   );
@@ -127,6 +128,7 @@ export function uiTestRoutes(ctx: AppContext): Router {
       const existing = requireOwned(ctx, res, tests.get(req.params.id), 'UI test');
       const test = normalizeUiTest(restoreUiSecrets(req.body ?? {}, existing), existing.projectId, existing);
       ctx.uiFolders.assertFolder(test.projectId, test.folderId);
+      ctx.apps.assertForTest(test);
       res.json(presentUiTest(tests.save(test)));
     }),
   );

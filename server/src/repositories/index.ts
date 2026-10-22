@@ -7,6 +7,7 @@ import type {
   PerfRun,
   PerfTest,
   Project,
+  ProjectApp,
   Run,
   Scenario,
   Schedule,
@@ -50,6 +51,7 @@ export function createRepositories(db: Database) {
   uiTests.assignMissingCodes();
   return {
     projects: new DocumentRepository<Project>(db, 'projects'),
+    apps: new DocumentRepository<ProjectApp>(db, 'project_apps', byProject),
     environments: new DocumentRepository<Environment>(db, 'environments', byProject),
     apis: new DocumentRepository<ApiDefinition>(db, 'apis', byProject),
     apiFolders: new DocumentRepository<Folder>(db, 'api_folders', byProject),

@@ -13,6 +13,7 @@ import { AppiumSettingsService } from './services/appium-settings-service';
 import { DeviceLockManager } from './services/device-lock-manager';
 import { MobileProviders, realAndroidProbe, type AndroidProbe } from './services/mobile-driver-provider';
 import { FirebaseDistributionService } from './services/firebase-service';
+import { AppService } from './services/app-service';
 import { FlowRunService } from './services/flow-run-service';
 import { androidApkDir } from './services/android-service';
 import { EmailSettingsService, type MailProvider } from './services/email-settings-service';
@@ -73,17 +74,21 @@ export function createAppContext(
     schedules: () => uiSchedules,
     apiBase: firebaseApiBase ?? process.env.FLOWQA_FIREBASE_API,
   });
-  const mobileProviders = new MobileProviders(appium, appiumServer, deviceLocks, probe, () =>
-    firebase.latestApk(),
+  const mobileProviders = new MobileProviders(appium, appiumServer, deviceLocks, probe, (appId) =>
+    firebase.latestApk(appId),
   );
+  // App per project (Android / Web): Firebase, phone/tablet, mode & serial bawaan.
+  const apps = new AppService(repos, appium, firebase);
+  apps.migrate();
   const uiRuns = new UiRunService(
     repos,
     notifications,
     (request) => runs.runEmbedded(request),
     appium,
     mobileProviders,
+    apps,
   );
-  const inspector = new MobileInspectorService(repos, uiFolders, appium, mobileProviders);
+  const inspector = new MobileInspectorService(repos, uiFolders, appium, mobileProviders, apps);
   const android = new AndroidService(appium, appiumServer, deviceLocks, mobileProviders);
   // Force stop emulator: hentikan dulu test / inspector yang sedang memakainya.
   android.describeDeviceUser = (owner) => {
@@ -125,10 +130,11 @@ export function createAppContext(
     uiRuns,
     uiSchedules: (uiSchedules = new UiScheduleService(repos, uiRuns)),
     firebase,
+    apps,
     flowRuns: new FlowRunService(repos, uiRuns, runs, notifications),
     recorder: new UiRecorderService(repos, uiFolders),
     inspector,
-    deletion: new DeletionService(repos),
+    deletion: new DeletionService(repos, (_projectId, appIds) => apps.forgetProject(appIds)),
   };
 }
 

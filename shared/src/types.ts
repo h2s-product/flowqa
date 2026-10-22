@@ -961,6 +961,68 @@ export interface MobileAppConfig {
   capabilities: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* Aplikasi per project (Android / Web)                                 */
+/* ------------------------------------------------------------------ */
+
+export const APP_PLATFORMS = ['android', 'web'] as const;
+export type AppPlatform = (typeof APP_PLATFORMS)[number];
+/** Jenis perangkat Android: HP biasa atau tablet (dideteksi dari ukuran layar). */
+export const FORM_FACTORS = ['phone', 'tablet'] as const;
+export type FormFactor = (typeof FORM_FACTORS)[number];
+
+/**
+ * Satu aplikasi di project, mis. MTT → "FO Apps" (Android, HP), "Agro Apps"
+ * (Android, tablet), "FARM ERP" (Web). Test case dihubungkan ke satu app.
+ */
+export interface ProjectApp extends Timestamps {
+  id: string;
+  projectId: string;
+  name: string;
+  platform: AppPlatform;
+  description: string;
+  /** Web: nama variabel environment berisi URL aplikasi, mis. FARM_URL → start URL {{FARM_URL}}. */
+  urlVariable?: string;
+  /** Web: ukuran layar default test baru. */
+  viewport?: { width: number; height: number };
+  /** Android: aplikasi & perangkat. */
+  android?: AppAndroidSettings;
+}
+
+export interface AppAndroidSettings {
+  /** Package & activity aplikasi (mis. com.maxxi.alsintan.dev). */
+  appPackage: string;
+  appActivity: string;
+  /** Sumber APK test baru: "firebase:latest", path APK, atau kosong (aplikasi terpasang). */
+  app: string;
+  /** Jenis perangkat yang dipakai: phone / tablet / kosong = bebas. */
+  formFactor: FormFactor | '';
+  /** Mode bawaan bila saat Run tidak dipilih (jadwal, Firebase, bulk run). Kosong = bawaan Settings. */
+  defaultMode: MobileExecutionMode | '';
+  /** Serial adb perangkat tertentu (mis. emulator-5554 / R58XXXX); kosong = yang pertama siap. */
+  udid: string;
+}
+
+/** Jenis perangkat dari serial adb: "emulator-5554" = emulator, selain itu HP. */
+export const serialKind = (udid: string): 'emulator' | 'device' =>
+  /^emulator-\d+$/.test(udid.trim()) ? 'emulator' : 'device';
+
+/**
+ * Phone / tablet dari properti Android: "tablet" di ro.build.characteristics, atau
+ * lebar layar terkecil ≥ 600 dp (aturan Android untuk tablet).
+ */
+export function formFactorOf(input: {
+  characteristics?: string;
+  width?: number;
+  height?: number;
+  density?: number;
+}): FormFactor | undefined {
+  if (/\btablet\b/i.test(input.characteristics ?? '')) return 'tablet';
+  const { width, height, density } = input;
+  if (!width || !height || !density) return undefined;
+  return (Math.min(width, height) * 160) / density >= 600 ? 'tablet' : 'phone';
+}
+
 /** Pengaturan server Appium (Settings → Mobile (Android)). */
 export interface AppiumSettings {
   serverUrl: string;
@@ -1096,6 +1158,8 @@ export interface AndroidDevice {
   type: 'emulator' | 'device';
   /** Nama AVD (emulator saja). */
   avd?: string;
+  /** HP atau tablet (bila bisa dideteksi). */
+  formFactor?: FormFactor;
   androidVersion: string;
   apiLevel: string;
   connection: 'USB' | 'Wi-Fi' | 'Emulator' | '-';
@@ -1416,6 +1480,8 @@ export interface UiTestCase extends Timestamps {
   target?: UiTestTarget;
   /** Wajib untuk target mobile. */
   mobile?: MobileAppConfig;
+  /** Aplikasi project yang dites (Firebase, perangkat phone/tablet, URL web). */
+  appId?: string | null;
 }
 
 /**

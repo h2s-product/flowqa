@@ -8,6 +8,7 @@ import type { NotificationService } from '../services/notification-service';
 import type { MobileInspectorService } from '../services/mobile-inspector-service';
 import type { FlowRunService } from '../services/flow-run-service';
 import type { FirebaseDistributionService } from '../services/firebase-service';
+import type { AppService } from '../services/app-service';
 import type { DeviceLockManager } from '../services/device-lock-manager';
 import type { AndroidService } from '../services/android-service';
 import type { AppiumSettingsService } from '../services/appium-settings-service';
@@ -29,6 +30,7 @@ export interface AppContext {
   android: AndroidService;
   deviceLocks: DeviceLockManager;
   firebase: FirebaseDistributionService;
+  apps: AppService;
   flowRuns: FlowRunService;
   runs: RunService;
   perf: PerfService;

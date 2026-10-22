@@ -216,4 +216,15 @@ export const migrations: string[] = [
   CREATE INDEX idx_e2e_runs_project_started ON e2e_runs(project_id, started_at DESC);
   CREATE INDEX idx_e2e_runs_flow_started ON e2e_runs(flow_id, started_at DESC);
   `,
+  // Aplikasi per project (Android / Web): Firebase, perangkat (phone/tablet), URL web.
+  `
+  CREATE TABLE project_apps (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX idx_project_apps_project ON project_apps(project_id);
+  `,
 ];

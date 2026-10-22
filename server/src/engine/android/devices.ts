@@ -6,7 +6,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { AndroidDevice, AndroidDeviceStatus } from '@flowqa/shared';
+import type { AndroidDevice, AndroidDeviceStatus, FormFactor } from '@flowqa/shared';
+import { formFactorOf } from '@flowqa/shared';
 import { androidVersionOfApi } from './sdk';
 import { run, stream, toolchain } from './toolchain';
 
@@ -15,6 +16,49 @@ const prop = async (serial: string, name: string) =>
 
 export const LOCKED_HELP =
   'The screen is locked. Unlock the phone and keep it unlocked while testing (tip: Developer options → Stay awake, and set Screen lock to None/Swipe on a test phone). Testora never unlocks a device for you.';
+
+/** Ukuran & kepadatan layar dari `wm size` / `wm density` (nilai override diutamakan). */
+export function parseWm(
+  size: string,
+  density: string,
+): { width?: number; height?: number; density?: number } {
+  const pick = (out: string, re: RegExp) => {
+    const override = new RegExp(`Override ${re.source}`).exec(out);
+    return (override ?? new RegExp(`Physical ${re.source}`).exec(out) ?? re.exec(out))?.slice(1).map(Number);
+  };
+  const [width, height] = pick(size, /size: (\d+)x(\d+)/) ?? [];
+  const [dpi] = pick(density, /density: (\d+)/) ?? [];
+  return { width, height, density: dpi };
+}
+
+/** HP / tablet perangkat yang menyala (di-cache per serial; ukuran layar jarang berubah). */
+const formFactors = new Map<string, FormFactor | undefined>();
+async function detectFormFactor(serial: string): Promise<FormFactor | undefined> {
+  if (formFactors.has(serial)) return formFactors.get(serial);
+  const tc = toolchain();
+  const [characteristics, size, density] = await Promise.all([
+    prop(serial, 'ro.build.characteristics').catch(() => ''),
+    run(tc.adb, ['-s', serial, 'shell', 'wm', 'size'], { timeoutMs: 5_000, env: tc.env }).then(
+      (r) => r.stdout,
+    ),
+    run(tc.adb, ['-s', serial, 'shell', 'wm', 'density'], { timeoutMs: 5_000, env: tc.env }).then(
+      (r) => r.stdout,
+    ),
+  ]).catch(() => ['', '', ''] as const);
+  const result = formFactorOf({ characteristics, ...parseWm(size, density) });
+  if (result) formFactors.set(serial, result);
+  return result;
+}
+
+/** HP / tablet AVD yang belum menyala, dari config.ini-nya. */
+export function avdFormFactor(config: Record<string, string>): FormFactor | undefined {
+  if (/tablet/i.test(config['hw.device.name'] ?? '')) return 'tablet';
+  return formFactorOf({
+    width: Number(config['hw.lcd.width']) || undefined,
+    height: Number(config['hw.lcd.height']) || undefined,
+    density: Number(config['hw.lcd.density']) || undefined,
+  });
+}
 
 /** true = layar kunci (keyguard) sedang tampil. */
 export async function isLocked(serial: string): Promise<boolean> {
@@ -141,6 +185,7 @@ export async function listDevices(busy: Set<string> = new Set()): Promise<Androi
         booted !== '1' ? 'BOOTING' : busy.has(d.serial) ? 'BUSY' : 'CONNECTED';
       // HP fisik yang terkunci terhubung, tetapi belum bisa dipakai otomasi.
       const locked = !emulator && status === 'CONNECTED' && (await isLocked(d.serial));
+      const formFactor = booted === '1' ? await detectFormFactor(d.serial) : undefined;
       const brand =
         manufacturer && model && !model.toLowerCase().startsWith(manufacturer.toLowerCase())
           ? `${manufacturer} ${model}`
@@ -149,6 +194,7 @@ export async function listDevices(busy: Set<string> = new Set()): Promise<Androi
         ...base,
         name: avd || brand || d.model || d.serial,
         ...(avd ? { avd } : {}),
+        ...(formFactor ? { formFactor } : {}),
         androidVersion: release ? `Android ${release}` : '',
         apiLevel: sdk,
         status,
@@ -185,10 +231,12 @@ export async function listDevices(busy: Set<string> = new Set()): Promise<Androi
       });
       continue;
     }
+    const avdKind = avdFormFactor(config);
     devices.push({
       id: `avd:${avd}`,
       name: avd,
       avd,
+      ...(avdKind ? { formFactor: avdKind } : {}),
       type: 'emulator',
       androidVersion: api && androidVersionOfApi(api) ? `Android ${androidVersionOfApi(api)}` : '',
       apiLevel: api,

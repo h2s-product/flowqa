@@ -389,23 +389,19 @@ export async function executeMobileStep(
         const elements = await driver.session.findElements(using, v).catch(() => [] as string[]);
         const shown: string[] = [];
         for (const e of elements.slice(0, 50))
-          if (await driver.session.displayed(e).catch(() => false)) shown.push(await driver.textOf(e).catch(() => ''));
+          if (await driver.session.displayed(e).catch(() => false))
+            shown.push(await driver.textOf(e).catch(() => ''));
         return shown;
       });
     case 'assertSorted':
-      return assertSorted(
-        selectors,
-        value,
-        timeout,
-        async (selector) => {
-          const { using, value: v } = toLocator(selector);
-          const elements = await driver.session.findElements(using, v).catch(() => [] as string[]);
-          const rows: string[] = [];
-          for (const e of elements.slice(0, 100))
-            if (await driver.session.displayed(e).catch(() => true)) rows.push(await driver.textOf(e));
-          return rows;
-        },
-      );
+      return assertSorted(selectors, value, timeout, async (selector) => {
+        const { using, value: v } = toLocator(selector);
+        const elements = await driver.session.findElements(using, v).catch(() => [] as string[]);
+        const rows: string[] = [];
+        for (const e of elements.slice(0, 100))
+          if (await driver.session.displayed(e).catch(() => true)) rows.push(await driver.textOf(e));
+        return rows;
+      });
   }
 
   const { element, selector } = await driver.find(selectors, timeout);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FirebaseSettings } from '@flowqa/shared';
+import type { FirebaseSettings, ProjectApp } from '@flowqa/shared';
 import {
   useAndroidDevices,
   useFirebaseActions,
@@ -16,7 +16,6 @@ import { Icon } from '@/components/Icon';
 import { EmptyState, ErrorBox, Field, IconButton, Loading, Segmented, Toggle } from '@/components/ui';
 import { useConfirm } from '@/context/ConfirmContext';
 import { useToast } from '@/context/ToastContext';
-import { useWorkspace } from '@/context/WorkspaceContext';
 
 type Form = Omit<FirebaseSettings, 'serviceAccount'>;
 const EMPTY: Form = {
@@ -33,16 +32,19 @@ const INTERVALS = [5, 15, 30, 60, 180, 720, 1440];
 const intervalLabel = (m: number) =>
   m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : m < 1440 ? `${m / 60} hours` : '1 day';
 
-/** Settings → Mobile (Android) → Firebase: App Distribution → unduh & pasang APK baru. */
-export function FirebaseTab() {
-  const { projectId = '' } = useWorkspace();
-  const settings = useFirebaseSettings();
-  const save = useSaveFirebaseSettings();
-  const reset = useResetFirebaseSettings();
-  const test = useTestFirebase();
-  const actions = useFirebaseActions();
+/**
+ * Apps → app Android → Firebase: App Distribution → unduh & pasang APK baru.
+ * Setiap app punya koneksi sendiri (project number, App ID, service account key).
+ */
+export function FirebasePanel({ app }: { app: ProjectApp }) {
+  const ref = { projectId: app.projectId, appId: app.id };
+  const settings = useFirebaseSettings(ref);
+  const save = useSaveFirebaseSettings(ref);
+  const reset = useResetFirebaseSettings(ref);
+  const test = useTestFirebase(ref);
+  const actions = useFirebaseActions(ref);
   const devices = useAndroidDevices();
-  const schedules = useUiSchedules(projectId);
+  const schedules = useUiSchedules(app.projectId);
   const toast = useToast();
   const confirm = useConfirm();
   const file = useRef<HTMLInputElement>(null);
@@ -51,9 +53,17 @@ export function FirebaseTab() {
   const [keyError, setKeyError] = useState('');
   const view = settings.data;
   const configured = !!view?.configured;
-  const releases = useFirebaseReleases(configured);
-  const events = useFirebaseEvents(configured);
+  const releases = useFirebaseReleases(ref, configured);
+  const events = useFirebaseEvents(ref, configured);
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
+
+  // Ganti app: form & key yang belum disimpan dibuang.
+  useEffect(() => {
+    setKey(null);
+    setKeyError('');
+    test.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.id]);
 
   useEffect(() => {
     if (view) {
@@ -96,8 +106,12 @@ export function FirebaseTab() {
     (view.keySet || !!key) &&
     /^\d{4,}$/.test(form.projectNumber) &&
     /^1:\d+:android:[0-9a-f]+$/i.test(form.appId);
+  const formFactor = app.android?.formFactor;
   const connected = (devices.data ?? []).filter(
-    (d) => !d.id.startsWith('avd:') && d.type === form.installMode,
+    (d) =>
+      !d.id.startsWith('avd:') &&
+      d.type === form.installMode &&
+      (!formFactor || !d.formFactor || d.formFactor === formFactor),
   );
   const scheduleList = schedules.data ?? [];
 
@@ -108,13 +122,17 @@ export function FirebaseTab() {
         <span>
           {configured ? (
             <>
-              Connected to Firebase App Distribution as <b>{view.serviceAccountEmail}</b>
+              <b>{app.name}</b> is connected to Firebase App Distribution as <b>{view.serviceAccountEmail}</b>
               {form.autoInstall
                 ? ` — checking for new releases every ${intervalLabel(form.intervalMinutes)}.`
                 : '.'}
             </>
           ) : (
-            'Connect Firebase App Distribution to download and install every new APK release on your emulator or phone.'
+            <>
+              <b>{app.name}</b> is not connected yet. Connect its own Firebase App Distribution app (with its
+              own service account key) to download and install every new APK release on your emulator or
+              device.
+            </>
           )}
         </span>
       </div>
@@ -243,7 +261,10 @@ export function FirebaseTab() {
                 <Field label="Device">
                   <select className="in" value={form.udid} onChange={(e) => set({ udid: e.target.value })}>
                     <option value="">
-                      First ready {form.installMode === 'device' ? 'phone' : 'emulator'}
+                      First ready{' '}
+                      {form.installMode === 'device'
+                        ? formFactor || 'phone'
+                        : `${formFactor ? `${formFactor} ` : ''}emulator`}
                     </option>
                     {connected.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -270,7 +291,7 @@ export function FirebaseTab() {
                   label="Schedule"
                   hint={
                     scheduleList.length
-                      ? 'Schedules of the project chosen at the top left. Tip: use app “Latest Firebase release” in those tests.'
+                      ? `Schedules of this project. Tip: link those tests to ${app.name} and use “Latest Firebase release” — it then uses this app's Firebase connection.`
                       : 'This project has no schedules yet — create one in UI Tester → Test Scheduler.'
                   }
                 >
@@ -286,7 +307,7 @@ export function FirebaseTab() {
                       </option>
                     ))}
                     {form.scheduleId && !scheduleList.some((s) => s.id === form.scheduleId) && (
-                      <option value={form.scheduleId}>Schedule of another project</option>
+                      <option value={form.scheduleId}>Deleted schedule — choose another</option>
                     )}
                   </select>
                 </Field>
@@ -305,8 +326,9 @@ export function FirebaseTab() {
               className="btn ghost"
               onClick={async () =>
                 (await confirm({
-                  title: 'Disconnect Firebase?',
-                  message: 'The saved service account key is deleted from Testora. Downloaded APKs stay.',
+                  title: `Disconnect Firebase from ${app.name}?`,
+                  message:
+                    'The saved service account key of this app is deleted from Testora. Other apps keep their connection. Downloaded APKs stay.',
                   confirmLabel: 'Disconnect',
                 })) && reset.mutate(undefined, { onSuccess: () => toast('Firebase disconnected') })
               }

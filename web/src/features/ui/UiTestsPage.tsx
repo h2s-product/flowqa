@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useAddDemoUiTest,
+  useApps,
   useDeleteUiTest,
   useDuplicateUiTest,
   useRunUiTestAndOpen,
@@ -69,14 +70,23 @@ export function UiTestsPage() {
   const [newMobile, setNewMobile] = useState(false);
   const [platform, setPlatform] = useState<PlatformFilter>('all');
   const [mode, setMode] = useExecutionMode();
+  const { data: apps = [] } = useApps(projectId);
+  const appName = new Map(apps.map((a) => [a.id, a.name]));
+  const [params, setParams] = useSearchParams();
+  const appFilter = params.get('app') ?? '';
   const hasMobile = tests.some((t) => testTarget(t) === 'mobile');
+  const byPlatform = platform === 'all' ? tests : tests.filter((t) => platformOf(t) === platform);
   const browser = useFolderBrowser({
     kind: 'ui',
     projectId,
-    items: platform === 'all' ? tests : tests.filter((t) => platformOf(t) === platform),
+    items: appFilter
+      ? byPlatform.filter((t) => (appFilter === 'none' ? !t.appId : t.appId === appFilter))
+      : byPlatform,
     labels: LABELS,
     matches: (t, q) =>
-      `${t.code ?? ''} ${t.name} ${testSubtitle(t)} ${t.description}`.toLowerCase().includes(q),
+      `${t.code ?? ''} ${t.name} ${testSubtitle(t)} ${t.description} ${appName.get(t.appId ?? '') ?? ''}`
+        .toLowerCase()
+        .includes(q),
   });
 
   if (isLoading || browser.loading) return <Loading />;
@@ -118,6 +128,32 @@ export function UiTestsPage() {
         />
         {(hasMobile || platform !== 'all') && (
           <Segmented options={PLATFORM_FILTERS} value={platform} onChange={setPlatform} />
+        )}
+        {apps.length > 0 && (
+          <select
+            className="in"
+            style={{ width: 'auto' }}
+            aria-label="Filter by app"
+            value={appFilter}
+            onChange={(e) =>
+              setParams(
+                (p) => {
+                  if (e.target.value) p.set('app', e.target.value);
+                  else p.delete('app');
+                  return p;
+                },
+                { replace: true },
+              )
+            }
+          >
+            <option value="">All apps</option>
+            {apps.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+            <option value="none">Not linked to an app</option>
+          </select>
         )}
         <div className="grow" />
         {hasMobile && <ExecutionModePicker value={mode} onChange={setMode} />}
@@ -204,10 +240,17 @@ export function UiTestsPage() {
               />
               <td style={{ minWidth: 220 }}>
                 {t.code && <span className="chip plain code test-code">{t.code}</span>} <b>{t.name}</b>{' '}
-                {testTarget(t) === 'mobile' && (
+                {t.appId && appName.has(t.appId) ? (
                   <span className="chip plain platform-chip">
-                    <Icon name="android" size={11} /> Android
+                    <Icon name={testTarget(t) === 'mobile' ? 'android' : 'globe'} size={11} />{' '}
+                    {appName.get(t.appId)}
                   </span>
+                ) : (
+                  testTarget(t) === 'mobile' && (
+                    <span className="chip plain platform-chip">
+                      <Icon name="android" size={11} /> Android
+                    </span>
+                  )
                 )}
                 <div className="small muted code" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {showFolder ? (

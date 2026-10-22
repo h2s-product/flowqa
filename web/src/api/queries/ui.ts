@@ -179,6 +179,7 @@ export function useStartRecording(projectId: string) {
       startUrl?: string;
       folderId?: string | null;
       testCaseId?: string;
+      appId?: string;
       environmentId?: string;
       login?: RecordingLogin;
       /** Simpan URL/login yang diketik sebagai {{WEB_URL}}, {{WEB_USER}}, {{WEB_PASSWORD}}. */
@@ -289,6 +290,7 @@ export function useStartInspector(projectId: string) {
       environmentId?: string;
       mobile?: MobileAppConfig;
       mode?: MobileExecutionMode;
+      appId?: string;
     }) => http.post<MobileInspectorSession>(`/projects/${projectId}/mobile-inspector`, body),
   });
 }

@@ -12,6 +12,7 @@ import type {
   FirebaseRelease,
   FirebaseSettings,
   FirebaseSettingsView,
+  ProjectApp,
   UploadedApk,
 } from '@flowqa/shared';
 import { ApiError, apiUrl, http } from '../client';
@@ -188,78 +189,120 @@ export function useDeleteApk() {
 }
 
 /* ---------------------- Firebase App Distribution ---------------------- */
+/* Koneksi Firebase per app Android (Apps). */
 
-export const useFirebaseSettings = (enabled = true) =>
+/** App Android yang koneksi Firebase-nya dipakai. */
+export interface AppRef {
+  projectId: string;
+  appId: string;
+}
+const fb = ({ projectId, appId }: AppRef) => `/projects/${projectId}/apps/${appId}/firebase`;
+
+export const useFirebaseSettings = (ref: AppRef, enabled = true) =>
   useQuery({
-    queryKey: keys.firebase,
-    queryFn: () => http.get<FirebaseSettingsView>('/android/firebase'),
-    enabled,
+    queryKey: keys.firebase(ref.appId),
+    queryFn: () => http.get<FirebaseSettingsView>(fb(ref)),
+    enabled: enabled && !!ref.appId,
   });
 
-export function useSaveFirebaseSettings() {
+export function useSaveFirebaseSettings(ref: AppRef) {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (settings: Partial<FirebaseSettings>) =>
-      http.put<FirebaseSettingsView>('/android/firebase', settings),
-    onSuccess: () => invalidate(keys.firebase, keys.firebaseReleases),
+    mutationFn: (settings: Partial<FirebaseSettings>) => http.put<FirebaseSettingsView>(fb(ref), settings),
+    onSuccess: () => invalidate(keys.firebase(ref.appId), keys.firebaseReleases(ref.appId)),
   });
 }
 
-export function useResetFirebaseSettings() {
+export function useResetFirebaseSettings(ref: AppRef) {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: () => http.delete<FirebaseSettingsView>('/android/firebase'),
-    onSuccess: () => invalidate(keys.firebase, keys.firebaseReleases),
+    mutationFn: () => http.delete<FirebaseSettingsView>(fb(ref)),
+    onSuccess: () => invalidate(keys.firebase(ref.appId), keys.firebaseReleases(ref.appId)),
   });
 }
 
-export const useTestFirebase = () =>
+export const useTestFirebase = (ref: AppRef) =>
   useMutation({
     mutationFn: (settings: Partial<FirebaseSettings>) =>
-      http.post<{ ok: boolean; message: string; latest?: FirebaseRelease }>(
-        '/android/firebase/test',
-        settings,
-      ),
+      http.post<{ ok: boolean; message: string; latest?: FirebaseRelease }>(`${fb(ref)}/test`, settings),
   });
 
-export const useFirebaseReleases = (enabled: boolean) =>
+export const useFirebaseReleases = (ref: AppRef, enabled: boolean) =>
   useQuery({
-    queryKey: keys.firebaseReleases,
-    queryFn: () => http.get<FirebaseRelease[]>('/android/firebase/releases'),
-    enabled,
+    queryKey: keys.firebaseReleases(ref.appId),
+    queryFn: () => http.get<FirebaseRelease[]>(`${fb(ref)}/releases`),
+    enabled: enabled && !!ref.appId,
     retry: false,
   });
 
-export const useFirebaseEvents = (enabled: boolean) =>
+export const useFirebaseEvents = (ref: AppRef, enabled: boolean) =>
   useQuery({
-    queryKey: keys.firebaseEvents,
-    queryFn: () => http.get<FirebaseEvent[]>('/android/firebase/events'),
-    enabled,
+    queryKey: keys.firebaseEvents(ref.appId),
+    queryFn: () => http.get<FirebaseEvent[]>(`${fb(ref)}/events`),
+    enabled: enabled && !!ref.appId,
     refetchInterval: enabled ? 15_000 : false,
   });
 
-export function useFirebaseActions() {
+export function useFirebaseActions(ref: AppRef) {
   const invalidate = useInvalidate();
-  const done = () => invalidate(keys.firebase, keys.firebaseReleases, keys.firebaseEvents, keys.androidApks);
+  const done = () =>
+    invalidate(
+      keys.firebase(ref.appId),
+      keys.firebaseReleases(ref.appId),
+      keys.firebaseEvents(ref.appId),
+      keys.androidApks,
+    );
   return {
     download: useMutation({
       mutationFn: (id: string) =>
         http.post<UploadedApk & { release: string }>(
-          `/android/firebase/releases/${encodeURIComponent(id)}/download`,
+          `${fb(ref)}/releases/${encodeURIComponent(id)}/download`,
         ),
       onSuccess: done,
     }),
     install: useMutation({
       mutationFn: ({ id, mode, udid }: { id: string; mode: 'emulator' | 'device'; udid?: string }) =>
         http.post<{ release: string; device: string }>(
-          `/android/firebase/releases/${encodeURIComponent(id)}/install`,
-          { mode, udid },
+          `${fb(ref)}/releases/${encodeURIComponent(id)}/install`,
+          {
+            mode,
+            udid,
+          },
         ),
       onSuccess: done,
     }),
     check: useMutation({
-      mutationFn: () => http.post<FirebaseEvent>('/android/firebase/check'),
+      mutationFn: () => http.post<FirebaseEvent>(`${fb(ref)}/check`),
       onSuccess: done,
     }),
   };
+}
+
+/* ------------------------------ apps per project ------------------------------ */
+
+export const useApps = (projectId?: string) =>
+  useQuery({
+    queryKey: keys.apps(projectId ?? ''),
+    queryFn: () => http.get<ProjectApp[]>(`/projects/${projectId}/apps`),
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+
+export function useSaveApp(projectId: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (app: Partial<ProjectApp>) =>
+      app.id
+        ? http.put<ProjectApp>(`/projects/${projectId}/apps/${app.id}`, app)
+        : http.post<ProjectApp>(`/projects/${projectId}/apps`, app),
+    onSuccess: () => invalidate(keys.apps(projectId)),
+  });
+}
+
+export function useDeleteApp(projectId: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (appId: string) => http.delete<void>(`/projects/${projectId}/apps/${appId}`),
+    onSuccess: () => invalidate(keys.apps(projectId), keys.uiTests(projectId)),
+  });
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppSelect } from '@/features/apps/AppSelect';
 import type { EnvVariable, Environment, RecordingLogin } from '@flowqa/shared';
 import { RECORDING_VARIABLES } from '@flowqa/shared';
 import { useNavigate } from 'react-router-dom';
@@ -59,6 +60,7 @@ export function NewRecordingModal({
   const saved = savedInputs(environment);
   const savedLogin = !!(saved.user && saved.password);
   const [startUrl, setStartUrl] = useState(saved.url ? ref(RECORDING_VARIABLES.url) : 'https://');
+  const [appId, setAppId] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<string | null>(defaultFolderId);
   const [useEnv, setUseEnv] = useState(false);
   const [signIn, setSignIn] = useState(savedLogin);
@@ -113,6 +115,7 @@ export function NewRecordingModal({
         folderId,
         environmentId: needsEnv ? environment?.id : undefined,
         login: signIn ? login : undefined,
+        ...(appId ? { appId } : {}),
         remember: remember ? Object.fromEntries(rememberable.map((r) => [r.part, true])) : undefined,
       },
       {
@@ -152,6 +155,20 @@ export function NewRecordingModal({
             value={name}
             placeholder="e.g. Login and create an order"
             onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
+        <Field
+          label="App"
+          hint="The web platform of the project this test belongs to (Apps). Its URL variable becomes the start URL."
+        >
+          <AppSelect
+            projectId={projectId}
+            platform="web"
+            value={appId}
+            onChange={(app) => {
+              setAppId(app?.id ?? null);
+              if (app?.urlVariable) setStartUrl(ref(app.urlVariable));
+            }}
           />
         </Field>
         <Field

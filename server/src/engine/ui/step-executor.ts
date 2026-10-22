@@ -500,7 +500,11 @@ export async function assertNotVisible(
     if (Date.now() >= deadline) break;
     await sleep(POLL_MS);
   }
-  const sample = shown.texts.find((t) => t.trim())?.replace(/\s+/g, ' ').trim().slice(0, 80);
+  const sample = shown.texts
+    .find((t) => t.trim())
+    ?.replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
   throw new UiStepError(
     `${shown.texts.length} matching element${shown.texts.length > 1 ? 's are' : ' is'} still shown (${shown.selector}${sample ? `, e.g. "${sample}"` : ''}).`,
   );

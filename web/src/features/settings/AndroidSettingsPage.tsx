@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type {
   AndroidDependency,
   AndroidDevice,
@@ -38,7 +38,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useConfirm } from '@/context/ConfirmContext';
 import { useToast } from '@/context/ToastContext';
 import { MobileErrorHelp, MODE_OPTIONS } from '@/features/ui/mobileMode';
-import { FirebaseTab } from './FirebaseTab';
 
 type TabId = 'environment' | 'appium' | 'devices' | 'connection' | 'firebase';
 const TABS: { id: TabId; label: string }[] = [
@@ -94,7 +93,21 @@ export function AndroidSettingsPage() {
       {tab === 'appium' && <AppiumTab />}
       {tab === 'devices' && <DevicesTab />}
       {tab === 'connection' && <ConnectionTab />}
-      {tab === 'firebase' && <FirebaseTab />}
+      {tab === 'firebase' && (
+        <div className="panel">
+          <EmptyState
+            title="Firebase is set per app now"
+            action={
+              <Link className="btn primary" to="/apps">
+                Open Apps
+              </Link>
+            }
+          >
+            Each Android app of a project (e.g. FO Apps, Agro Apps) has its own Firebase connection, service
+            account key, auto-install and default device. Set them up in <b>Apps</b>.
+          </EmptyState>
+        </div>
+      )}
     </div>
   );
 }
@@ -606,7 +619,14 @@ function DevicesTab() {
         {d.status === 'UNAUTHORIZED' ? <div className="small text-fail">ADB Unauthorized</div> : null}
       </td>
       <td className="code small">{d.id.startsWith('avd:') ? '-' : d.id}</td>
-      <td>{d.type === 'emulator' ? 'Emulator' : `Device · ${d.connection}`}</td>
+      <td>
+        {d.type === 'emulator' ? 'Emulator' : `Device · ${d.connection}`}
+        {d.formFactor && (
+          <span className="chip plain" style={{ marginLeft: 6 }}>
+            {d.formFactor === 'tablet' ? 'Tablet' : 'Phone'}
+          </span>
+        )}
+      </td>
       <td>
         {d.androidVersion || '-'}
         {d.apiLevel && <span className="small muted"> (API {d.apiLevel})</span>}

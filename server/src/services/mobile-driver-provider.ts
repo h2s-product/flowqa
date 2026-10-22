@@ -13,6 +13,7 @@
  */
 import type {
   AndroidDevice,
+  FormFactor,
   MobileAppConfig,
   MobileErrorCode,
   MobileExecutionMode,
@@ -60,6 +61,10 @@ export interface MobileLease {
 }
 
 export interface AcquireRequest {
+  /** App project yang dites: menentukan koneksi Firebase untuk "firebase:latest". */
+  appId?: string;
+  /** Hanya pakai HP / tablet (perangkat yang jenisnya tak terdeteksi tetap boleh). */
+  formFactor?: FormFactor;
   config: MobileAppConfig;
   resolve: (text: string) => string;
   /** Mis. "UI run uir_…" — ditampilkan sebagai pemakai perangkat. */
@@ -227,7 +232,7 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
     private readonly server: AppiumServerManager,
     private readonly locks: DeviceLockManager,
     private readonly probe: AndroidProbe = realAndroidProbe,
-    private readonly latestFirebaseApk?: () => Promise<string>,
+    private readonly latestFirebaseApk?: (appId: string) => Promise<string>,
   ) {}
 
   /** Pastikan Appium menjawab; server lokal dinyalakan otomatis bila Appium terpasang. */
@@ -259,10 +264,14 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
       throw new MobileError('UIAUTOMATOR2_NOT_INSTALLED', 'The Appium UiAutomator2 driver is not installed.');
   }
 
-  /** Pilih perangkat sesuai mode (atau serial yang dipasang di test). */
+  /**
+   * Pilih perangkat sesuai mode (atau serial yang dipasang di test), dan phone /
+   * tablet sesuai app. Perangkat yang jenisnya tak terdeteksi tetap boleh dipakai.
+   */
   private async candidates(
     config: MobileAppConfig,
     onStatus?: (m: string) => void,
+    formFactor?: FormFactor,
   ): Promise<{ ids: string[]; names: Map<string, { name: string; version: string }> }> {
     const type = this.mode === 'emulator' ? 'emulator' : 'device';
     let devices = await this.probe.devices(this.locks.busyIds());
@@ -271,17 +280,18 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
     const kindOf = (id: string) =>
       devices.find((d) => d.id === id)?.type ?? (id.startsWith('emulator-') ? 'emulator' : 'device');
     const udid = config.udid && kindOf(config.udid) === type ? config.udid : '';
+    const fits = (d: AndroidDevice) => !formFactor || !d.formFactor || d.formFactor === formFactor;
     const pick = () =>
       devices.filter(
         (d) =>
           !d.id.startsWith('avd:') &&
-          (udid ? d.id === udid : d.type === type) &&
+          (udid ? d.id === udid : d.type === type && fits(d)) &&
           (d.status === 'CONNECTED' || d.status === 'BUSY' || d.status === 'BOOTING'),
       );
     let found = pick();
     // Emulator yang sudah dibuat tetapi belum menyala → nyalakan (tidak pernah membuat AVD baru diam-diam).
     if (!found.length && this.mode === 'emulator' && !udid) {
-      const avd = devices.find((d) => d.id.startsWith('avd:') && d.status === 'DISCONNECTED');
+      const avd = devices.find((d) => d.id.startsWith('avd:') && d.status === 'DISCONNECTED' && fits(d));
       if (avd?.avd) {
         onStatus?.(`Starting the emulator ${avd.avd}…`);
         this.probe.startEmulator(avd.avd);
@@ -312,8 +322,8 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
         udid
           ? `The device ${udid} set in this test is not connected.`
           : this.mode === 'emulator'
-            ? 'No Android emulator is running or available.'
-            : 'No physical Android device is connected over USB.',
+            ? `No Android ${formFactor ? `${formFactor} ` : ''}emulator is running or available.`
+            : `No physical Android ${formFactor ?? 'device'} is connected over USB.`,
       );
     }
     return {
@@ -324,11 +334,16 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
     };
   }
 
-  /** "firebase:latest" → path APK release Firebase terbaru (diunduh bila perlu). */
-  private async firebaseApk(): Promise<string> {
+  /** "firebase:latest" → path APK release Firebase terbaru app ini (diunduh bila perlu). */
+  private async firebaseApk(appId?: string): Promise<string> {
     if (!this.latestFirebaseApk)
       throw new MobileError('APP_NOT_CONFIGURED', 'Firebase App Distribution is not connected.');
-    return this.latestFirebaseApk().catch((error) => {
+    if (!appId)
+      throw new MobileError(
+        'APP_NOT_CONFIGURED',
+        '"Latest Firebase release" needs the test case to be linked to an app (its Firebase connection is set in Apps).',
+      );
+    return this.latestFirebaseApk(appId).catch((error) => {
       throw new MobileError(
         'APP_NOT_CONFIGURED',
         `Could not get the latest Firebase release: ${(error as Error).message}`,
@@ -339,7 +354,7 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
   async acquire(request: AcquireRequest): Promise<MobileLease> {
     if (request.config.app.trim() === FIREBASE_LATEST_APP) {
       request.onStatus?.('Downloading the latest Firebase release…');
-      request = { ...request, config: { ...request.config, app: await this.firebaseApk() } };
+      request = { ...request, config: { ...request.config, app: await this.firebaseApk(request.appId) } };
     }
     const { url } = { url: this.settings.current().serverUrl };
     const settings = this.settings.current();
@@ -348,7 +363,7 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
     this.server.addSecrets(secrets);
     const appiumVersion = await this.ensureAppium(url, request.onStatus);
     await this.ensureDriver(url);
-    const { ids, names } = await this.candidates(request.config, request.onStatus);
+    const { ids, names } = await this.candidates(request.config, request.onStatus, request.formFactor);
     const lease = await this.locks.acquire(ids, request.owner, request.onQueued, request.signal);
     const device = names.get(lease.udid) ?? { name: lease.udid, version: '' };
     if (!lease.udid.startsWith('emulator-') && (await this.probe.isLocked(lease.udid).catch(() => false))) {
@@ -388,7 +403,7 @@ export class AppiumAndroidDriverProvider implements MobileDriverProvider {
       'android',
       appIdOf(request.config, session.capabilities),
       String(caps['appium:app'] ?? ''),
-      this.latestFirebaseApk && (() => this.firebaseApk()),
+      this.latestFirebaseApk && (() => this.firebaseApk(request.appId)),
     );
     // Pastikan aplikasi yang dites benar-benar di depan dan tergambar. Layar sisa dari aplikasi
     // lain (mis. overlay pencarian) bisa tetap menutupi walau aplikasinya sudah di-restart.
@@ -435,8 +450,8 @@ export class MobileProviders {
     server: AppiumServerManager,
     readonly locks: DeviceLockManager,
     probe: AndroidProbe = realAndroidProbe,
-    /** APK release Firebase terbaru (untuk app / step "firebase:latest"). */
-    latestFirebaseApk?: () => Promise<string>,
+    /** APK release Firebase terbaru app (untuk app / step "firebase:latest"). */
+    latestFirebaseApk?: (appId: string) => Promise<string>,
   ) {
     this.mock = new MockMobileDriverProvider(locks);
     this.real = {

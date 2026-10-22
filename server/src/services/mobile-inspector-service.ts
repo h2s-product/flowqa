@@ -16,6 +16,7 @@ import type {
   UiStep,
   UiTestCase,
 } from '@flowqa/shared';
+import type { AppService } from './app-service';
 import {
   createId,
   MAX_UI_STEP_DELAY_MS,
@@ -55,6 +56,8 @@ interface Session extends MobileInspectorSession {
   scale: number;
   /** Mencegah dua aksi berjalan bersamaan di satu perangkat. */
   busy: boolean;
+  /** App project yang direkam (test baru ikut dihubungkan ke app ini). */
+  appId: string | null;
 }
 
 /** Lebar & tinggi PNG dari header IHDR (tanpa library gambar). */
@@ -94,6 +97,7 @@ export class MobileInspectorService {
     private readonly folders: FolderService<UiTestCase>,
     private readonly appium: AppiumSettingsService,
     private readonly providers: MobileProviders,
+    private readonly apps?: AppService,
   ) {
     this.janitor = setInterval(() => {
       for (const s of this.sessions.values())
@@ -142,6 +146,8 @@ export class MobileInspectorService {
       environmentId?: unknown;
       mobile?: unknown;
       mode?: unknown;
+      /** App Android project yang direkam (test baru). */
+      appId?: unknown;
     },
   ): MobileInspectorSession {
     const open = [...this.sessions.values()].filter((s) => s.status !== 'stopped' && s.status !== 'failed');
@@ -165,11 +171,19 @@ export class MobileInspectorService {
       ? assertProjectEnvironment(this.repos, projectId, input.environmentId)
       : noEnvironment();
     const resolve = variableResolver(environment);
+    // App yang direkam: dari test yang dilanjutkan, atau dipilih saat membuat test baru.
+    const chosenApp = existing?.appId ?? (input.appId ? String(input.appId) : null);
+    const appRef = { projectId, appId: chosenApp };
+    if (chosenApp) {
+      const app = this.repos.apps.get(chosenApp);
+      if (!app || app.projectId !== projectId || app.platform !== 'android')
+        throw new HttpError(400, 'Choose an Android app of this project');
+    }
     const mode: MobileExecutionMode = (MOBILE_EXECUTION_MODES as readonly string[]).includes(
       String(input.mode),
     )
       ? (input.mode as MobileExecutionMode)
-      : this.appium.current().defaultMode;
+      : (this.apps?.mode(appRef) ?? this.appium.current().defaultMode);
     try {
       buildCapabilities(mobile, this.appium.current().capabilities, resolve);
     } catch (error) {
@@ -194,13 +208,16 @@ export class MobileInspectorService {
       lastActionAt: Date.now(),
       scale: 1,
       busy: true,
+      appId: appRef.appId ?? null,
     };
     this.sessions.set(session.id, session);
 
     void (async () => {
       try {
         const lease = await this.providers.get(mode).acquire({
-          config: mobile,
+          appId: appRef.appId ?? undefined,
+          formFactor: this.apps?.formFactor(appRef) || undefined,
+          config: this.apps?.config(appRef, mobile, mode) ?? mobile,
           resolve,
           owner: `Mobile Inspector ${session.id}`,
           secrets: environment.variables.filter((v) => v.secret).map((v) => v.value),
@@ -380,6 +397,7 @@ export class MobileInspectorService {
           name: input.name ?? session.name,
           target: 'mobile',
           mobile: session.mobile,
+          ...(session.appId ? { appId: session.appId } : {}),
           folderId: input.folderId !== undefined ? input.folderId : session.folderId,
           steps: session.steps,
         },
