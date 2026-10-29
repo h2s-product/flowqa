@@ -1517,6 +1517,74 @@ export interface UiStepResult {
   screenshot?: string;
   /** Berkas yang dihasilkan step (mis. page source dari step "pageSource"). */
   artifact?: string;
+  /** Step gagal: analisa penyebab kegagalan dalam bahasa yang mudah dipahami. */
+  analysis?: UiFailureAnalysis;
+}
+
+/** Jenis kegagalan step UI test (menentukan isi analisa). */
+export type UiFailureKind =
+  | 'element-not-found'
+  | 'element-hidden'
+  | 'element-blocked'
+  | 'element-disabled'
+  | 'text-mismatch'
+  | 'rows-mismatch'
+  | 'no-rows'
+  | 'still-shown'
+  | 'url-mismatch'
+  | 'value-mismatch'
+  | 'option-missing'
+  | 'not-sorted'
+  | 'page-timeout'
+  | 'page-unreachable'
+  | 'session-lost'
+  | 'missing-variable'
+  | 'step-config'
+  | 'api-scenario'
+  | 'unknown';
+
+/** Sumber masalah yang paling mungkin. */
+export type UiFailureSource = 'application' | 'test-script' | 'environment' | 'test-data' | 'unclear';
+
+export const UI_FAILURE_SOURCE_LABELS: Record<UiFailureSource, string> = {
+  application: 'Kemungkinan bug / perubahan di aplikasi',
+  'test-script': 'Kemungkinan step test perlu disesuaikan',
+  environment: 'Kemungkinan masalah koneksi / server / environment',
+  'test-data': 'Kemungkinan data uji tidak sesuai / berubah',
+  unclear: 'Perlu dicek manual',
+};
+
+/** Bukti dari halaman / layar saat step gagal. */
+export interface UiFailureEvidence {
+  /** Web: URL & judul halaman saat gagal. */
+  url?: string;
+  title?: string;
+  /** Hasil tiap selector step: jumlah elemen cocok & yang terlihat. */
+  selectors?: { selector: string; count: number; visible: number }[];
+  /** Pesan yang tampil di halaman (alert, toast, dialog error, 404). */
+  messages?: string[];
+  /** Halaman masih menampilkan indikator memuat (spinner / skeleton / "Memuat"). */
+  loading?: boolean;
+  /** Halaman yang tampil adalah halaman login (sesi habis / login gagal). */
+  loginPage?: boolean;
+  /** Variabel {{...}} di step yang belum punya nilai. */
+  missingVariables?: string[];
+}
+
+/**
+ * Analisa kegagalan step: apa yang terjadi, kemungkinan penyebab (urut dari yang
+ * paling mungkin, berdasarkan bukti), dan langkah perbaikan yang disarankan.
+ */
+export interface UiFailureAnalysis {
+  kind: UiFailureKind;
+  likely: UiFailureSource;
+  /** Ringkasan satu kalimat, mis. 'Elemen untuk "Klik submenu Tim Drone" tidak bisa diklik'. */
+  title: string;
+  /** Penjelasan apa yang terjadi, dengan bukti dari halaman. */
+  summary: string;
+  causes: string[];
+  suggestions: string[];
+  evidence?: UiFailureEvidence;
 }
 
 /**
@@ -1810,18 +1878,46 @@ export function parseSortOrder(value: string): SortOrder | null {
 }
 
 const MONTHS: Record<string, number> = {
-  jan: 1, januari: 1, january: 1,
-  feb: 2, februari: 2, february: 2, peb: 2,
-  mar: 3, maret: 3, march: 3,
-  apr: 4, april: 4,
-  mei: 5, may: 5,
-  jun: 6, juni: 6, june: 6,
-  jul: 7, juli: 7, july: 7,
-  agu: 8, agt: 8, agus: 8, agustus: 8, aug: 8, august: 8,
-  sep: 9, sept: 9, september: 9,
-  okt: 10, oktober: 10, oct: 10, october: 10,
-  nov: 11, november: 11, nop: 11,
-  des: 12, desember: 12, dec: 12, december: 12,
+  jan: 1,
+  januari: 1,
+  january: 1,
+  feb: 2,
+  februari: 2,
+  february: 2,
+  peb: 2,
+  mar: 3,
+  maret: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  mei: 5,
+  may: 5,
+  jun: 6,
+  juni: 6,
+  june: 6,
+  jul: 7,
+  juli: 7,
+  july: 7,
+  agu: 8,
+  agt: 8,
+  agus: 8,
+  agustus: 8,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  okt: 10,
+  oktober: 10,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  nop: 11,
+  des: 12,
+  desember: 12,
+  dec: 12,
+  december: 12,
 };
 
 /**
@@ -1842,7 +1938,8 @@ export function sortableValue(text: string): { kind: 'date' | 'number'; value: n
   if (!m) return null;
   let n = m[0];
   // "195.000.000" / "1.500,25" (format Indonesia) vs "1,500.25" (format Inggris).
-  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(n) || /^-?\d+,\d{1,2}$/.test(n)) n = n.replace(/\./g, '').replace(',', '.');
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(n) || /^-?\d+,\d{1,2}$/.test(n))
+    n = n.replace(/\./g, '').replace(',', '.');
   else n = n.replace(/,/g, '');
   const value = Number(n);
   return Number.isFinite(value) ? { kind: 'number', value } : null;
@@ -1864,7 +1961,8 @@ export function checkSortOrder(
   const kind = parsed.length ? (dates * 2 >= parsed.length ? 'date' : 'number') : null;
   const rows = parsed.filter((x) => x.v.kind === kind);
   const brokenAt = rows.findIndex(
-    (x, i) => i > 0 && (order === 'ascending' ? x.v.value < rows[i - 1].v.value : x.v.value > rows[i - 1].v.value),
+    (x, i) =>
+      i > 0 && (order === 'ascending' ? x.v.value < rows[i - 1].v.value : x.v.value > rows[i - 1].v.value),
   );
   return { ok: brokenAt < 0, values: rows.map((x) => x.text), brokenAt, kind };
 }

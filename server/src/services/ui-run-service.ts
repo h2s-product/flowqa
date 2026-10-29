@@ -12,6 +12,7 @@ import type {
   Run,
   RunTrigger,
   UiRun,
+  UiFailureEvidence,
   UiRunPace,
   UiStep,
   UiStepResult,
@@ -27,6 +28,7 @@ import {
   watchNetwork,
   type UiStepOutcome,
 } from '../engine/ui/step-executor';
+import { analyzeUiFailure, collectWebEvidence, unresolvedVariables } from '../engine/ui/failure-analysis';
 import { defaultPace, isPaced, stepDelay, waitUntil } from '../engine/ui/pacing';
 import { HttpError, notFound } from '../lib/http';
 import { nowIso } from '../lib/time';
@@ -91,6 +93,8 @@ interface StepRunner {
   explain(error: unknown): string;
   /** Dipanggil sekali saat step pertama gagal (simpan page source, log). */
   onFailure?: () => Promise<void>;
+  /** Bukti dari halaman saat step gagal (URL, elemen yang cocok, pesan error) untuk analisa. */
+  evidence?: (selectors: string[]) => Promise<UiFailureEvidence>;
 }
 
 export class UiRunService {
@@ -433,6 +437,7 @@ export class UiRunService {
             return shot ? file : null;
           },
           explain: explainUiError,
+          evidence: (selectors) => collectWebEvidence(page, selectors),
         },
         vars,
         tried,
@@ -741,6 +746,7 @@ export class UiRunService {
               'screenshot',
               'artifact',
               'apiRunId',
+              'analysis',
             ] as const)
               delete r[key];
             r.status = 'queued';
@@ -757,6 +763,16 @@ export class UiRunService {
           ? `${reason} (after ${log.length} ${log.length === 1 ? 'retry' : 'retries'}: ${log.join(' | ')})`
           : reason;
         failed = true;
+        result.analysis = await this.analyzeFailure(
+          test,
+          run,
+          index,
+          error,
+          reason,
+          runner,
+          resolve,
+          log?.length,
+        );
         await runner.onFailure?.().catch(() => {});
       }
       result.durationMs = Math.round(performance.now() - started);
@@ -768,6 +784,56 @@ export class UiRunService {
         if (file) result.screenshot = file;
       }
       this.persist(run);
+    }
+  }
+
+  /**
+   * Analisa step yang gagal: pesan error teknis + bukti dari halaman + step sebelumnya
+   * yang dilewati karena kondisi → penjelasan, kemungkinan penyebab, dan saran.
+   * Tidak pernah membuat run gagal karena analisanya sendiri bermasalah.
+   */
+  private async analyzeFailure(
+    test: UiTestCase,
+    run: UiRun,
+    index: number,
+    error: unknown,
+    reason: string,
+    runner: StepRunner,
+    resolve: UiVariables,
+    retries = 0,
+  ): Promise<UiStepResult['analysis']> {
+    const step = test.steps[index];
+    const safe = (text: string) => {
+      try {
+        return resolve(text);
+      } catch {
+        return text;
+      }
+    };
+    try {
+      const selectors = step.selectors.map(safe);
+      const evidence = runner.evidence ? await runner.evidence(selectors).catch(() => undefined) : undefined;
+      const missing = unresolvedVariables([...step.selectors, step.value ?? ''], resolve);
+      const skippedBefore = run.steps
+        .slice(Math.max(0, index - 3), index)
+        .filter((s) => s.status === 'skipped' && s.error)
+        .map((s) => ({ index: s.index, description: s.description, reason: s.error! }));
+      const raw = error instanceof UiStepError ? error.message : ((error as Error)?.message ?? reason);
+      return analyzeUiFailure({
+        step,
+        index,
+        // Pesan Playwright lengkap (call log) memuat petunjuk penting, mis. "intercepts pointer events".
+        error: raw.includes(reason) ? raw : `${reason}\n${raw}`,
+        target: run.target === 'mobile' ? 'mobile' : 'web',
+        selectors,
+        value: step.type === 'navigate' ? safe(step.value) : undefined,
+        evidence: missing.length ? { ...evidence, missingVariables: missing } : evidence,
+        skippedBefore,
+        retries,
+      });
+    } catch (analysisError) {
+      log.warn(`Could not analyze the failed UI step: ${(analysisError as Error)?.message ?? analysisError}`);
+      return undefined;
     }
   }
 
