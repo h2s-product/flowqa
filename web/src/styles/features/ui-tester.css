@@ -393,3 +393,47 @@ table.t tr.run-group svg {
   margin-right: 4px;
   vertical-align: 1px;
 }
+
+/* Analisa kegagalan step UI test */
+.ui-failure-analysis {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.ui-failure-analysis ol,
+.ui-failure-analysis ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.ui-failure-analysis li + li {
+  margin-top: 3px;
+}
+.ui-failure-analysis summary {
+  cursor: pointer;
+  color: var(--ink3);
+}
+.ui-failure-analysis dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 6px 0 0;
+}
+.ui-failure-analysis dt {
+  color: var(--ink3);
+}
+.ui-failure-analysis dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ui-failure-analysis .chip.likely-application {
+  color: var(--red);
+  border-color: var(--red);
+}
+.ui-failure-analysis .chip.likely-test-script {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.ui-failure-analysis .chip.likely-environment,
+.ui-failure-analysis .chip.likely-test-data {
+  color: var(--amber);
+  border-color: var(--amber);
+}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { UiRun } from '@flowqa/shared';
 import { LIVE_UI_RUN_STATUSES, MOBILE_EXECUTION_MODE_LABEL } from '@flowqa/shared';
 import { MobileErrorHelp } from './mobileMode';
+import { StepFailureAnalysis } from './StepFailureAnalysis';
 import { useRunUiTestAndOpen, useStopUiRun, useUiRun } from '@/api/queries';
 import { DateTime } from '@/components/DateTime';
 import { Icon } from '@/components/Icon';
@@ -245,11 +246,13 @@ export function UiRunDetailPage() {
                     <Link to={`/runs/${s.apiRunId}`}>Open API run (requests & responses)</Link>
                   </div>
                 )}
+                {s.analysis && s.status === 'failed' && <StepFailureAnalysis analysis={s.analysis} />}
                 {s.error && (
                   <div
                     className="small"
                     style={{ color: s.status === 'failed' ? 'var(--red)' : 'var(--ink3)' }}
                   >
+                    {s.analysis && s.status === 'failed' ? 'Pesan teknis: ' : ''}
                     {s.error}
                   </div>
                 )}
@@ -341,6 +344,11 @@ function Lightbox({
           <IconButton icon="x" label="Close" size={16} onClick={onClose} />
         </div>
         <img src={shotUrl(run, step.screenshot!)} alt={`Screenshot after step ${step.index + 1}`} />
+        {step.analysis && step.status === 'failed' && (
+          <div style={{ marginTop: 8 }}>
+            <StepFailureAnalysis analysis={step.analysis} compact />
+          </div>
+        )}
         {step.error && (
           <div className="small" style={{ color: 'var(--red)', marginTop: 8 }}>
             {step.error}

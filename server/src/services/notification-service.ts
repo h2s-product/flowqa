@@ -4,7 +4,7 @@
  * ringkasan. Kegagalan kirim hanya dicatat di log — tidak pernah memengaruhi run.
  */
 import type { FlowRun, NotificationStatus, PerfRun, Project, ReportData, Run, UiRun } from '@flowqa/shared';
-import { uiRunTargetLabel } from '@flowqa/shared';
+import { UI_FAILURE_SOURCE_LABELS, uiRunTargetLabel } from '@flowqa/shared';
 import { HttpError, notFound } from '../lib/http';
 import { log } from '../lib/log';
 import type { Mailer } from '../lib/mailer';
@@ -188,7 +188,7 @@ export class NotificationService {
       startedAt: run.startedAt,
       durationMs: run.durationMs,
       counts: run.counts,
-      failure: run.failureReason,
+      failure: uiFailureText(run),
       url: `${this.appUrl}/ui/runs/${run.id}`,
     };
   }
@@ -223,4 +223,12 @@ export class NotificationService {
       log.warn(`could not send the result email for "${project.name}": ${(error as Error).message}`);
     }
   }
+}
+
+/** Penyebab gagal UI run untuk email: pesan teknis + ringkasan analisa step yang gagal. */
+function uiFailureText(run: UiRun): string | undefined {
+  const analysis = run.steps.find((s) => s.status === 'failed')?.analysis;
+  if (!analysis) return run.failureReason;
+  const head = `${analysis.title} — ${UI_FAILURE_SOURCE_LABELS[analysis.likely]}.`;
+  return run.failureReason ? `${head} ${run.failureReason}` : head;
 }
